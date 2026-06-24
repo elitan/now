@@ -12,7 +12,7 @@ export async function writeGeneratedClientFiles(
   projectRoot: string,
   clientRuntimePath: string,
 ): Promise<GeneratedClientFiles> {
-  const directory = join(projectRoot, ".next2", "generated");
+  const directory = join(projectRoot, ".now", "generated");
   const entry = join(directory, "client-entry.tsx");
   const html = join(directory, "index.html");
 
@@ -30,7 +30,7 @@ export async function writeGeneratedClientFiles(
 function createClientEntry(clientRuntimePath: string): string {
   return [
     `import { boot } from "${toViteFsPath(clientRuntimePath)}";`,
-    'import { notFoundComponent, routes } from "virtual:next2/routes";',
+    'import { notFoundComponent, routes } from "virtual:now/routes";',
     "",
     "boot({",
     "  routes,",
@@ -47,11 +47,11 @@ function createHtml(): string {
     "  <head>",
     '    <meta charset="UTF-8" />',
     '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
-    "    <title>next2 app</title>",
+    "    <title>now app</title>",
     "  </head>",
     "  <body>",
     '    <div id="root"></div>',
-    '    <script type="module" src="/.next2/generated/client-entry.tsx"></script>',
+    '    <script type="module" src="/.now/generated/client-entry.tsx"></script>',
     "  </body>",
     "</html>",
     "",

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export function createTempProject(): string {
-  const root = join(tmpdir(), `next2-test-${process.pid}-${Date.now()}`);
+  const root = join(tmpdir(), `now-test-${process.pid}-${Date.now()}`);
 
   mkdirSync(root, {
     recursive: true,

@@ -1,4 +1,4 @@
-import type { ApiRouteContext } from "next2/server";
+import type { ApiRouteContext } from "now/server";
 
 export function GET(_request: Request, context: ApiRouteContext): Response {
   return Response.json({

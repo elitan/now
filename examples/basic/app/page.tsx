@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "next2/client";
+import { Link } from "now/client";
 
 export default function HomePage(): React.ReactElement {
   const [apiResult, setApiResult] = useState("not called");

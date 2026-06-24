@@ -1,4 +1,4 @@
-import { useRouter, useSearchParams } from "next2/client";
+import { useRouter, useSearchParams } from "now/client";
 
 export default function AboutPage(): React.ReactElement {
   const router = useRouter();

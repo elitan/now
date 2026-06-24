@@ -9,7 +9,7 @@ import type { ApiRouteModule, RuntimeApiRoute } from "./api";
 import { dispatchApiRequest } from "./api";
 import { createWebRequest, type RunningServer, writeWebResponse } from "./http";
 import type { StartOptions } from "./prod";
-import { createViteConfig, resolveNext2RuntimePaths } from "./vite-config";
+import { createViteConfig, resolveNowRuntimePaths } from "./vite-config";
 
 export async function startDevServer(
   projectRoot: string,
@@ -18,7 +18,7 @@ export async function startDevServer(
   const root = resolve(projectRoot);
   const port = options.port ?? 3000;
   const hostname = options.hostname ?? "127.0.0.1";
-  const runtime = resolveNext2RuntimePaths();
+  const runtime = resolveNowRuntimePaths();
   const generated = await writeGeneratedClientFiles(root, runtime.client);
   const vite = await createViteServer(createViteConfig(root));
   const server = createServer(function handleRequest(request, response) {
@@ -144,7 +144,7 @@ function shouldUseViteMiddleware(pathname: string): boolean {
     pathname.startsWith("/@id") ||
     pathname.startsWith("/@fs") ||
     pathname.startsWith("/node_modules") ||
-    pathname.startsWith("/.next2") ||
+    pathname.startsWith("/.now") ||
     Boolean(extname(pathname)) ||
     existsSync(pathname)
   );

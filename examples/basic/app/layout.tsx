@@ -1,12 +1,12 @@
 import type { PropsWithChildren } from "react";
-import { Link } from "next2/client";
+import { Link } from "now/client";
 import "./styles.css";
 
 export default function RootLayout(props: PropsWithChildren): React.ReactElement {
   return (
     <div className="shell">
       <header className="topbar" data-testid="root-layout">
-        <strong>next2 example</strong>
+        <strong>now example</strong>
         <nav>
           <Link href="/">Home</Link>
           <Link href="/about?q=search">About</Link>

@@ -1,10 +1,10 @@
 {
-  "name": "next2",
+  "name": "now",
   "version": "0.1.0",
   "description": "A client-first React framework with Vite, file routing, server API routes, and one server.",
   "type": "module",
   "bin": {
-    "next2": "./dist/cli.js"
+    "now": "./dist/cli.js"
   },
   "exports": {
     ".": {

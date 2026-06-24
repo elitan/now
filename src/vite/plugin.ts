@@ -4,18 +4,18 @@ import { scanApp } from "../routing/scanner";
 import type { ClientRouteFile } from "../routing/types";
 import { normalizePath, toViteFsPath } from "./paths";
 
-const VIRTUAL_ROUTES_ID = "virtual:next2/routes";
+const VIRTUAL_ROUTES_ID = "virtual:now/routes";
 const RESOLVED_VIRTUAL_ROUTES_ID = `\0${VIRTUAL_ROUTES_ID}`;
 
-export interface Next2PluginOptions {
+export interface NowPluginOptions {
   projectRoot: string;
 }
 
-export function next2Plugin(options: Next2PluginOptions): Plugin {
+export function nowPlugin(options: NowPluginOptions): Plugin {
   const projectRoot = resolve(options.projectRoot);
 
   return {
-    name: "next2-routes",
+    name: "now-routes",
     resolveId(id: string) {
       if (id === VIRTUAL_ROUTES_ID) {
         return RESOLVED_VIRTUAL_ROUTES_ID;

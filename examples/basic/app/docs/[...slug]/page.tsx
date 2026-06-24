@@ -1,4 +1,4 @@
-import { useParams } from "next2/client";
+import { useParams } from "now/client";
 
 export default function DocsPage(): React.ReactElement {
   const params = useParams();

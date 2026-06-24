@@ -1,4 +1,4 @@
-import { Link } from "next2/client";
+import { Link } from "now/client";
 
 export default function NotFound(): React.ReactElement {
   return (

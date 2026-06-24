@@ -6,11 +6,11 @@ import { scanApiRoutes } from "../routing/scanner";
 import type { GeneratedServerRoute, ServerBuildManifest } from "../routing/types";
 import { writeGeneratedClientFiles } from "../vite/generated";
 import { normalizePath, resolveRuntimeFile } from "../vite/paths";
-import { createViteConfig, resolveNext2RuntimePaths } from "./vite-config";
+import { createViteConfig, resolveNowRuntimePaths } from "./vite-config";
 
 export async function buildProject(projectRoot: string): Promise<void> {
   const root = resolve(projectRoot);
-  const runtime = resolveNext2RuntimePaths();
+  const runtime = resolveNowRuntimePaths();
   const generated = await writeGeneratedClientFiles(root, runtime.client);
   const distDirectory = join(root, "dist");
 
@@ -30,7 +30,7 @@ async function normalizeClientIndex(projectRoot: string, generatedHtml: string):
   const html = await readFile(generatedOutput, "utf8");
 
   await writeFile(join(projectRoot, "dist", "client", "index.html"), html, "utf8");
-  await rm(join(projectRoot, "dist", "client", ".next2"), {
+  await rm(join(projectRoot, "dist", "client", ".now"), {
     recursive: true,
     force: true,
   });
@@ -79,11 +79,11 @@ async function bundleEntry(entry: string, outfile: string): Promise<void> {
     target: "node20",
     sourcemap: true,
     packages: "external",
-    plugins: [next2AliasPlugin()],
+    plugins: [nowAliasPlugin()],
   });
 }
 
-function next2AliasPlugin(): EsbuildPlugin {
+function nowAliasPlugin(): EsbuildPlugin {
   const runtime = {
     client: resolveRuntimeFile(["../client/index.js", "../client/index.tsx"]),
     server: resolveRuntimeFile(["../server/index.js", "../server/index.ts"]),
@@ -91,21 +91,21 @@ function next2AliasPlugin(): EsbuildPlugin {
   };
 
   return {
-    name: "next2-alias",
+    name: "now-alias",
     setup(build) {
-      build.onResolve({ filter: /^next2\/client$/ }, function resolveClient() {
+      build.onResolve({ filter: /^now\/client$/ }, function resolveClient() {
         return {
           path: runtime.client,
         };
       });
 
-      build.onResolve({ filter: /^next2\/server$/ }, function resolveServer() {
+      build.onResolve({ filter: /^now\/server$/ }, function resolveServer() {
         return {
           path: runtime.server,
         };
       });
 
-      build.onResolve({ filter: /^next2$/ }, function resolveIndex() {
+      build.onResolve({ filter: /^now$/ }, function resolveIndex() {
         return {
           path: runtime.index,
         };

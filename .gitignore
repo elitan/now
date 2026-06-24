@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.next2/
+.now/
 .research/
 coverage/
 playwright-report/

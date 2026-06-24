@@ -41,7 +41,7 @@ function shouldSkipEntry(entry: string): boolean {
     entry === "node_modules" ||
     entry === ".git" ||
     entry === "dist" ||
-    entry === ".next2" ||
+    entry === ".now" ||
     entry === ".research" ||
     entry === "coverage" ||
     entry === "playwright-report" ||

@@ -1,16 +1,16 @@
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import type { InlineConfig } from "vite";
-import { next2Plugin } from "../vite/plugin";
+import { nowPlugin } from "../vite/plugin";
 import { resolveRuntimeFile } from "../vite/paths";
 
-export interface Next2RuntimePaths {
+export interface NowRuntimePaths {
   client: string;
   server: string;
   index: string;
 }
 
-export function resolveNext2RuntimePaths(): Next2RuntimePaths {
+export function resolveNowRuntimePaths(): NowRuntimePaths {
   return {
     client: resolveRuntimeFile(["../client/index.js", "../client/index.tsx"]),
     server: resolveRuntimeFile(["../server/index.js", "../server/index.ts"]),
@@ -20,25 +20,25 @@ export function resolveNext2RuntimePaths(): Next2RuntimePaths {
 
 export function createViteConfig(projectRoot: string, htmlInput?: string): InlineConfig {
   const root = resolve(projectRoot);
-  const runtime = resolveNext2RuntimePaths();
+  const runtime = resolveNowRuntimePaths();
 
   const config: InlineConfig = {
     root,
     configFile: false,
     appType: "custom",
-    plugins: [react(), next2Plugin({ projectRoot: root })],
+    plugins: [react(), nowPlugin({ projectRoot: root })],
     resolve: {
       alias: [
         {
-          find: "next2/client",
+          find: "now/client",
           replacement: runtime.client,
         },
         {
-          find: "next2/server",
+          find: "now/server",
           replacement: runtime.server,
         },
         {
-          find: "next2",
+          find: "now",
           replacement: runtime.index,
         },
       ],

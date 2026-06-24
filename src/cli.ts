@@ -15,20 +15,20 @@ async function main(): Promise<void> {
 
   if (args.command === "dev") {
     const server = await startDevServer(args.root, args.options);
-    console.log(`next2 dev server listening on http://127.0.0.1:${server.port}`);
+    console.log(`now dev server listening on http://127.0.0.1:${server.port}`);
     bindShutdown(server.close);
     return;
   }
 
   if (args.command === "build") {
     await buildProject(args.root);
-    console.log("next2 build complete");
+    console.log("now build complete");
     return;
   }
 
   if (args.command === "start") {
     const server = await startProductionServer(args.root, args.options);
-    console.log(`next2 production server listening on http://127.0.0.1:${server.port}`);
+    console.log(`now production server listening on http://127.0.0.1:${server.port}`);
     bindShutdown(server.close);
     return;
   }
@@ -93,9 +93,9 @@ function bindShutdown(close: () => Promise<void>): void {
 
 function printHelp(): void {
   console.log("Usage:");
-  console.log("  next2 dev [root] --port 3000");
-  console.log("  next2 build [root]");
-  console.log("  next2 start [root] --port 3000");
+  console.log("  now dev [root] --port 3000");
+  console.log("  now build [root]");
+  console.log("  now start [root] --port 3000");
 }
 
 main().catch(function handleError(error) {

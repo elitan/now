@@ -1,4 +1,4 @@
-import type { ErrorViewProps } from "next2/client";
+import type { ErrorViewProps } from "now/client";
 
 export default function ErrorView(props: ErrorViewProps): React.ReactElement {
   const message = props.error instanceof Error ? props.error.message : "Unknown error";

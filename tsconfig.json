@@ -16,9 +16,9 @@
     "types": ["node", "react", "react-dom"],
     "baseUrl": ".",
     "paths": {
-      "next2": ["./src/index.ts"],
-      "next2/client": ["./src/client/index.tsx"],
-      "next2/server": ["./src/server/index.ts"]
+      "now": ["./src/index.ts"],
+      "now/client": ["./src/client/index.tsx"],
+      "now/server": ["./src/server/index.ts"]
     }
   },
   "include": [

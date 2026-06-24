@@ -63,7 +63,7 @@ export function boot(options: BootOptions): void {
   const rootElement = document.getElementById("root");
 
   if (!rootElement) {
-    throw new Error('next2 expected an element with id="root".');
+    throw new Error('now expected an element with id="root".');
   }
 
   createRoot(rootElement).render(
@@ -114,7 +114,7 @@ export function useRouter(): RouterApi {
   const router = useContext(RouterContext);
 
   if (!router) {
-    throw new Error("useRouter must be used inside next2's router.");
+    throw new Error("useRouter must be used inside now's router.");
   }
 
   return router;
@@ -422,7 +422,7 @@ function shouldUseBrowserNavigation(event: React.MouseEvent<HTMLAnchorElement>):
 }
 
 function DefaultLoading(): React.ReactElement {
-  return <div data-next2-loading="">Loading...</div>;
+  return <div data-now-loading="">Loading...</div>;
 }
 
 function DefaultNotFound(): React.ReactElement {

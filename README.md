@@ -1,6 +1,6 @@
-# next2
+# now
 
-`next2` is a small client-first React framework inspired by Next.js routing. It uses Vite for the browser bundle, renders pages on the client, and keeps everything under `app/api` on the server.
+`now` is a small client-first React framework inspired by Next.js routing. It uses Vite for the browser bundle, renders pages on the client, and keeps everything under `app/api` on the server.
 
 This is a v0 prototype. It intentionally does not implement SSR or React Server Components.
 
@@ -54,7 +54,7 @@ Every `app/api/**/route.ts` file is server-only. Handlers may export `GET`, `POS
 ## Runtime APIs
 
 ```tsx
-import { Link, useParams, useRouter, useSearchParams } from "next2/client";
+import { Link, useParams, useRouter, useSearchParams } from "now/client";
 
 export default function Page() {
   const params = useParams();
@@ -81,7 +81,7 @@ Use `app/api` for all server-side routes. For RPC libraries, make a catch-all se
 
 ```ts
 // app/api/rpc/[...path]/route.ts
-import type { ApiRouteContext } from "next2/server";
+import type { ApiRouteContext } from "now/server";
 
 export function ALL(request: Request, context: ApiRouteContext): Response {
   const url = new URL(request.url);
@@ -107,9 +107,9 @@ npm run verify
 The package CLI supports:
 
 ```bash
-next2 dev [root] --port 3000
-next2 build [root]
-next2 start [root] --port 3000
+now dev [root] --port 3000
+now build [root]
+now start [root] --port 3000
 ```
 
 ## Nitro Decision

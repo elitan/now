@@ -1,4 +1,4 @@
-import type { ApiRouteContext } from "next2/server";
+import type { ApiRouteContext } from "now/server";
 
 export function ALL(request: Request, context: ApiRouteContext): Response {
   const url = new URL(request.url);
