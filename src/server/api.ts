@@ -4,6 +4,7 @@ import type { ApiRouteFile, RouteParams } from "../routing/types";
 export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
+export type AnyHttpMethod = "ALL";
 
 export interface ApiRouteContext {
   params: RouteParams;
@@ -14,7 +15,7 @@ export type ApiRouteHandler = (
   context: ApiRouteContext,
 ) => Response | Promise<Response> | unknown | Promise<unknown>;
 
-export type ApiRouteModule = Partial<Record<HttpMethod, ApiRouteHandler>>;
+export type ApiRouteModule = Partial<Record<HttpMethod | AnyHttpMethod, ApiRouteHandler>>;
 
 export interface RuntimeApiRoute extends ApiRouteFile {
   load: () => Promise<ApiRouteModule>;
@@ -33,7 +34,7 @@ export async function dispatchApiRequest(
 
   const module = await match.route.load();
   const method = request.method.toUpperCase() as HttpMethod;
-  const handler = module[method];
+  const handler = module[method] ?? module.ALL;
 
   if (!handler) {
     return createMethodNotAllowedResponse(module);
@@ -52,6 +53,15 @@ export async function dispatchApiRequest(
 }
 
 function createMethodNotAllowedResponse(module: ApiRouteModule): Response {
+  if (module.ALL) {
+    return new Response("Method Not Allowed", {
+      status: 405,
+      headers: {
+        allow: HTTP_METHODS.join(", "),
+      },
+    });
+  }
+
   const allowed = HTTP_METHODS.filter(function filterMethod(method) {
     return Boolean(module[method]);
   });

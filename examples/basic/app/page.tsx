@@ -12,7 +12,7 @@ export default function HomePage(): React.ReactElement {
   }
 
   async function callRpc(): Promise<void> {
-    const response = await fetch("/rpc/hello");
+    const response = await fetch("/api/rpc/hello");
     const json = (await response.json()) as { rpc: boolean; path: string };
     setRpcResult(`${json.rpc}:${json.path}`);
   }
@@ -29,14 +29,14 @@ export default function HomePage(): React.ReactElement {
 
       <section className="panel stack">
         <button type="button" onClick={callApi}>
-          Call API
+          Call health route
         </button>
         <output data-testid="api-result">{apiResult}</output>
       </section>
 
       <section className="panel stack">
         <button type="button" onClick={callRpc}>
-          Call RPC mount
+          Call RPC route
         </button>
         <output data-testid="rpc-result">{rpcResult}</output>
       </section>

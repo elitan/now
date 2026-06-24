@@ -39,15 +39,24 @@ describe("dev and production flows", function integrationSuite() {
     const handler = await createProductionFetchHandler(exampleRoot);
     const apiResponse = await handler(new Request("http://test.local/api/users/123"));
     const apiJson = (await apiResponse.json()) as { id: string };
-    const rpcResponse = await handler(new Request("http://test.local/rpc/hello"));
-    const rpcJson = (await rpcResponse.json()) as { rpc: boolean; path: string };
+    const rpcResponse = await handler(
+      new Request("http://test.local/api/rpc/hello", {
+        method: "POST",
+      }),
+    );
+    const rpcJson = (await rpcResponse.json()) as {
+      rpc: boolean;
+      path: string;
+      params: string[];
+    };
     const pageResponse = await handler(new Request("http://test.local/docs/a/b"));
     const pageText = await pageResponse.text();
 
     expect(apiJson.id).toBe("123");
     expect(rpcJson).toEqual({
       rpc: true,
-      path: "/rpc/hello",
+      path: "/api/rpc/hello",
+      params: ["hello"],
     });
     expect(pageText).toContain('<div id="root"></div>');
     expect(join(exampleRoot, "dist", "server")).toContain("dist/server");

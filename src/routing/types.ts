@@ -46,5 +46,4 @@ export interface GeneratedServerRoute {
 
 export interface ServerBuildManifest {
   apiRoutes: GeneratedServerRoute[];
-  userServer?: string;
 }

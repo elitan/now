@@ -1,6 +1,6 @@
 # next2
 
-`next2` is a small client-first React framework inspired by Next.js routing. It uses Vite for the browser bundle, renders pages on the client, and keeps API/RPC handlers on the server.
+`next2` is a small client-first React framework inspired by Next.js routing. It uses Vite for the browser bundle, renders pages on the client, and keeps everything under `app/api` on the server.
 
 This is a v0 prototype. It intentionally does not implement SSR or React Server Components.
 
@@ -11,9 +11,8 @@ This is a v0 prototype. It intentionally does not implement SSR or React Server 
 - Static, dynamic, and catch-all routes.
 - Mandatory nested `layout.tsx` support.
 - `loading.tsx`, `error.tsx`, and `not-found.tsx` conventions.
-- Server API routes with standard `Request` and `Response`.
-- RPC-agnostic server mounts.
-- One server for Vite dev, production static assets, API routes, and RPC mounts.
+- Server routes under `app/api` with standard `Request` and `Response`.
+- One server for Vite dev, production static assets, and server routes.
 - Node runtime support and Bun smoke coverage where Bun is installed.
 
 ## App Conventions
@@ -42,7 +41,7 @@ Client routes:
 - `app/blog/[slug]/page.tsx` maps to `/blog/:slug`.
 - `app/docs/[...slug]/page.tsx` maps to `/docs/*slug`.
 
-API routes:
+Server routes:
 
 ```ts
 export function GET(request: Request): Response {
@@ -50,7 +49,7 @@ export function GET(request: Request): Response {
 }
 ```
 
-API handlers may export `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`.
+Every `app/api/**/route.ts` file is server-only. Handlers may export `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, and `ALL`.
 
 ## Runtime APIs
 
@@ -76,21 +75,25 @@ export default function Page() {
 }
 ```
 
-## RPC-Agnostic Mounts
+## Server Route Convention
 
-Use `server.ts` for server-side mounts. The core accepts standard fetch-style handlers, so tRPC, oRPC, Hono, or your own router can be adapted without becoming a core dependency.
+Use `app/api` for all server-side routes. For RPC libraries, make a catch-all server route. The core accepts standard fetch-style handlers, so tRPC, oRPC, Hono, or your own router can be adapted without becoming a core dependency.
 
 ```ts
-import { defineServer } from "next2/server";
+// app/api/rpc/[...path]/route.ts
+import type { ApiRouteContext } from "next2/server";
 
-export default defineServer(function configure(server) {
-  server.mount("/rpc", async function handleRpc(request) {
-    return Response.json({
-      path: new URL(request.url).pathname
-    });
+export function ALL(request: Request, context: ApiRouteContext): Response {
+  const url = new URL(request.url);
+
+  return Response.json({
+    path: url.pathname,
+    rpcPath: context.params.path
   });
-});
+}
 ```
+
+`ALL` is an adapter-friendly fallback that runs for any HTTP method when a specific method export is not present.
 
 ## Commands
 
@@ -111,7 +114,7 @@ next2 start [root] --port 3000
 
 ## Nitro Decision
 
-Nitro was evaluated as the server layer. The current implementation uses a minimal custom server because the public API needs to preserve Next-style `app/api/**/route.ts` method exports, framework-owned SPA fallback behavior, and an RPC-agnostic mount API. See `docs/adr/0001-server-runtime.md`.
+Nitro was evaluated as the server layer. The current implementation uses a minimal custom server because the public API needs to preserve Next-style `app/api/**/route.ts` server routes and framework-owned SPA fallback behavior. See `docs/adr/0001-server-runtime.md`.
 
 ## Known Limitations
 
@@ -120,4 +123,3 @@ Nitro was evaluated as the server layer. The current implementation uses a minim
 - `loading.tsx` is used as route-load pending UI, not streaming UI.
 - Catch-all params are exposed as arrays through `useParams`.
 - Production server output expects the project dependencies to be installed.
-

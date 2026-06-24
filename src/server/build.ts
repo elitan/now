@@ -1,5 +1,4 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { build as esbuildBuild, type Plugin as EsbuildPlugin } from "esbuild";
 import { build as viteBuild } from "vite";
@@ -62,14 +61,6 @@ async function buildServer(projectRoot: string): Promise<void> {
   const manifest: ServerBuildManifest = {
     apiRoutes: generatedRoutes,
   };
-
-  const serverFile = join(projectRoot, "server.ts");
-
-  if (existsSync(serverFile)) {
-    const userServer = "user-server.mjs";
-    await bundleEntry(serverFile, join(serverDirectory, userServer));
-    manifest.userServer = userServer;
-  }
 
   await writeFile(
     join(serverDirectory, "manifest.json"),

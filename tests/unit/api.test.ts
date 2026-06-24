@@ -86,4 +86,38 @@ describe("API dispatch", function apiDispatchSuite() {
 
     expect(json.path).toEqual(["a", "b", "c"]);
   });
+
+  it("uses ALL as an app/api fallback for RPC-style handlers", async function dispatchAllRoute() {
+    const routes: RuntimeApiRoute[] = [
+      {
+        id: "api-rpc-path-route",
+        routePath: "/api/rpc/*path",
+        filePath: "memory",
+        segments: parseRouteSegments(["api", "rpc", "[...path]"]),
+        load: async function loadModule() {
+          return {
+            ALL: function ALL(request, context) {
+              return Response.json({
+                method: request.method,
+                path: context.params.path,
+              });
+            },
+          };
+        },
+      },
+    ];
+
+    const response = await dispatchApiRequest(
+      new Request("http://test.local/api/rpc/posts/list", {
+        method: "POST",
+      }),
+      routes,
+    );
+    const json = (await response?.json()) as { method: string; path: string[] };
+
+    expect(json).toEqual({
+      method: "POST",
+      path: ["posts", "list"],
+    });
+  });
 });

@@ -8,7 +8,6 @@ import { writeGeneratedClientFiles } from "../vite/generated";
 import type { ApiRouteModule, RuntimeApiRoute } from "./api";
 import { dispatchApiRequest } from "./api";
 import { createWebRequest, type RunningServer, writeWebResponse } from "./http";
-import { dispatchMountRequest, loadServerMounts } from "./mounts";
 import type { StartOptions } from "./prod";
 import { createViteConfig, resolveNext2RuntimePaths } from "./vite-config";
 
@@ -118,15 +117,6 @@ async function tryHandleFrameworkRequest(
   vite: ViteDevServer,
   request: Request,
 ): Promise<Response | undefined> {
-  const mounts = await loadServerMounts(projectRoot, function loadUserServer(file) {
-    return vite.ssrLoadModule(file);
-  });
-  const mountResponse = await dispatchMountRequest(request, mounts);
-
-  if (mountResponse) {
-    return mountResponse;
-  }
-
   const apiResponse = await dispatchApiRequest(request, createDevApiRoutes(projectRoot, vite));
 
   if (apiResponse) {

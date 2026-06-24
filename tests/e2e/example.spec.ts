@@ -5,11 +5,11 @@ test("loads the home page and calls API/RPC handlers", async function homePage({
   await expect(page.getByTestId("root-layout")).toBeVisible();
   await expect(page.getByTestId("home-page")).toBeVisible();
 
-  await page.getByRole("button", { name: "Call API" }).click();
+  await page.getByRole("button", { name: "Call health route" }).click();
   await expect(page.getByTestId("api-result")).toHaveText("true:server");
 
-  await page.getByRole("button", { name: "Call RPC mount" }).click();
-  await expect(page.getByTestId("rpc-result")).toHaveText("true:/rpc/hello");
+  await page.getByRole("button", { name: "Call RPC route" }).click();
+  await expect(page.getByTestId("rpc-result")).toHaveText("true:/api/rpc/hello");
 });
 
 test("navigates with search params and client history", async function aboutNavigation({ page }) {
@@ -54,8 +54,15 @@ test("serves dynamic and catch-all API routes in production", async function api
   const userResponse = await request.get("/api/users/42");
   const userJson = (await userResponse.json()) as { id: string };
   const filesResponse = await request.get("/api/files/a/b/c");
+  const rpcResponse = await request.post("/api/rpc/e2e");
   const filesJson = (await filesResponse.json()) as { path: string[] };
+  const rpcJson = (await rpcResponse.json()) as { rpc: boolean; path: string; params: string[] };
 
   expect(userJson.id).toBe("42");
   expect(filesJson.path).toEqual(["a", "b", "c"]);
+  expect(rpcJson).toEqual({
+    rpc: true,
+    path: "/api/rpc/e2e",
+    params: ["e2e"],
+  });
 });

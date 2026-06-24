@@ -1,12 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import type { ServerBuildManifest } from "../routing/types";
 import type { ApiRouteModule, RuntimeApiRoute } from "./api";
 import { dispatchApiRequest } from "./api";
 import { startNodeServer, type RunningServer } from "./http";
-import { dispatchMountRequest, loadServerMountsFromFile } from "./mounts";
 import { serveSpaFallback, serveStaticFile } from "./static";
-import type { ServerBuildManifest } from "../routing/types";
 
 export interface StartOptions {
   port?: number;
@@ -31,22 +30,8 @@ export async function createProductionFetchHandler(
   const serverDirectory = join(root, "dist", "server");
   const manifest = await readManifest(serverDirectory);
   const routes = createRuntimeApiRoutes(serverDirectory, manifest);
-  const mounts = manifest.userServer
-    ? await loadServerMountsFromFile(
-        join(serverDirectory, manifest.userServer),
-        function importServer() {
-          return import(pathToFileURL(join(serverDirectory, manifest.userServer ?? "")).href);
-        },
-      )
-    : [];
 
   return async function handleProductionRequest(request: Request): Promise<Response> {
-    const mountResponse = await dispatchMountRequest(request, mounts);
-
-    if (mountResponse) {
-      return mountResponse;
-    }
-
     const apiResponse = await dispatchApiRequest(request, routes);
 
     if (apiResponse) {
