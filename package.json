@@ -1,0 +1,70 @@
+{
+  "name": "next2",
+  "version": "0.1.0",
+  "description": "A client-first React framework with Vite, file routing, server API routes, and one server.",
+  "type": "module",
+  "bin": {
+    "next2": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite/plugin.d.ts",
+      "import": "./dist/vite/plugin.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts dev",
+    "build": "tsup src/cli.ts src/index.ts src/client/index.tsx src/server/index.ts src/vite/plugin.ts --format esm --dts --clean --splitting false",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome check --formatter-enabled=true --linter-enabled=false --assist-enabled=false .",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit tests/integration",
+    "test:e2e": "playwright test",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run test:e2e && npm run smoke:prod && npm run smoke:bun",
+    "dev:example": "tsx src/cli.ts dev examples/basic",
+    "build:example": "tsx src/cli.ts build examples/basic",
+    "start:example": "tsx src/cli.ts start examples/basic",
+    "smoke:prod": "tsx tests/smoke/production-smoke.ts",
+    "smoke:bun": "tsx tests/smoke/bun-smoke.ts"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "esbuild": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "latest",
+    "@playwright/test": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tsup": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
