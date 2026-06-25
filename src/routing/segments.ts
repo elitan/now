@@ -58,8 +58,7 @@ export function parseRouteSegments(rawSegments: string[]): RouteSegment[] {
     });
   }
 
-  validateCatchAllPosition(segments);
-
+  validateCatchAllSegmentsAreTerminal(segments);
   return segments;
 }
 
@@ -77,12 +76,12 @@ export function routePathFromSegments(segments: RouteSegment[], prefix = ""): st
       continue;
     }
 
-    if (segment.kind === "catchAll") {
-      parts.push(`*${segment.param}`);
+    if (segment.kind === "optionalCatchAll") {
+      parts.push(`*${segment.param}?`);
       continue;
     }
 
-    parts.push(`*${segment.param}?`);
+    parts.push(`*${segment.param}`);
   }
 
   const joined = parts.join("/");
@@ -98,6 +97,9 @@ export function routePathFromSegments(segments: RouteSegment[], prefix = ""): st
 export function createRouteId(relativePath: string): string {
   return relativePath
     .replace(/\\/g, "/")
+    .replace(/\[\[\.\.\.([^\]]+)\]\]/g, "optional-catch-all-$1")
+    .replace(/\[\.\.\.([^\]]+)\]/g, "catch-all-$1")
+    .replace(/\[([^\]]+)\]/g, "dynamic-$1")
     .replace(/\.[^.]+$/, "")
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -114,21 +116,22 @@ function validateParam(param: string, segment: string): void {
   }
 }
 
-function validateCatchAllPosition(segments: RouteSegment[]): void {
-  for (let index = 0; index < segments.length; index += 1) {
-    const segment = segments[index];
+function validateCatchAllSegmentsAreTerminal(segments: RouteSegment[]): void {
+  const catchAllSegment = segments.find(function findCatchAll(segment) {
+    return segment.kind === "catchAll" || segment.kind === "optionalCatchAll";
+  });
 
-    if (!segment) {
-      continue;
-    }
-
-    if (
-      (segment.kind === "catchAll" || segment.kind === "optionalCatchAll") &&
-      index !== segments.length - 1
-    ) {
-      throw new Error(`Catch-all route segment "${segment.value}" must be the last segment.`);
-    }
+  if (!catchAllSegment) {
+    return;
   }
+
+  if (segments.indexOf(catchAllSegment) === segments.length - 1) {
+    return;
+  }
+
+  throw new Error(
+    `Catch-all route segment "${catchAllSegment.value}" must be the final route segment.`,
+  );
 }
 
 export type RouteParamsForPath<Path extends string> = string extends Path
@@ -156,7 +159,7 @@ type ParseRouteParams<Path extends string> = Path extends ""
     : SegmentParam<Path>;
 
 type SegmentParam<Segment extends string> = Segment extends `[[...${infer Param}]]`
-  ? { [Key in Param]?: string[] }
+  ? { [Key in Param]: string[] }
   : Segment extends `[...${infer Param}]`
     ? { [Key in Param]: string[] }
     : Segment extends `[${infer Param}]`
@@ -164,7 +167,7 @@ type SegmentParam<Segment extends string> = Segment extends `[[...${infer Param}
       : Segment extends `:${infer Param}`
         ? { [Key in Param]: string }
         : Segment extends `*${infer Param}?`
-          ? { [Key in Param]?: string[] }
+          ? { [Key in Param]: string[] }
           : Segment extends `*${infer Param}`
             ? { [Key in Param]: string[] }
             : EmptyRouteParams;

@@ -6,9 +6,7 @@ export interface RouteSegment {
   param?: string;
 }
 
-export type RouteParamValue = string | string[] | undefined;
-
-export type RouteParams = Record<string, RouteParamValue>;
+export type RouteParams = Record<string, string | string[]>;
 
 export interface ClientRouteFile {
   id: string;

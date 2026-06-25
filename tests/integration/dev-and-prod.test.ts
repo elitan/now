@@ -1,5 +1,7 @@
+import { readFile } from "node:fs/promises";
 import { afterAll, describe, expect, it } from "vitest";
 import { join, resolve } from "node:path";
+import type { ServerBuildManifest } from "../../src/routing/types";
 import { buildProject } from "../../src/server/build";
 import { startDevServer } from "../../src/server/dev";
 import { createProductionFetchHandler } from "../../src/server/prod";
@@ -31,6 +33,8 @@ describe("dev and production flows", function integrationSuite() {
     });
     const failureResponse = await fetch(`http://127.0.0.1:${server.port}/api/fail`);
     const failureText = await failureResponse.text();
+    const filesResponse = await fetch(`http://127.0.0.1:${server.port}/api/files`);
+    const filesJson = (await filesResponse.json()) as { path: string[] };
     const pageResponse = await fetch(`http://127.0.0.1:${server.port}/about?q=dev`);
     const pageText = await pageResponse.text();
 
@@ -44,6 +48,7 @@ describe("dev and production flows", function integrationSuite() {
     expect(optionsResponse.headers.get("allow")).toBe("GET, HEAD, OPTIONS");
     expect(failureResponse.status).toBe(500);
     expect(failureText).toContain("Intentional API route failure");
+    expect(filesJson.path).toEqual([]);
     expect(pageText).toContain('<div id="root"></div>');
   });
 
@@ -51,6 +56,14 @@ describe("dev and production flows", function integrationSuite() {
     await buildProject(exampleRoot);
 
     const handler = await createProductionFetchHandler(exampleRoot);
+    const manifestText = await readFile(
+      join(exampleRoot, "dist", "server", "manifest.json"),
+      "utf8",
+    );
+    const manifest = JSON.parse(manifestText) as ServerBuildManifest;
+    const filesRoute = manifest.apiRoutes.find(function findFilesRoute(route) {
+      return route.routePath === "/api/files/*path?";
+    });
     const apiResponse = await handler(new Request("http://test.local/api/users/123"));
     const apiJson = (await apiResponse.json()) as { id: string };
     const headResponse = await handler(
@@ -76,13 +89,20 @@ describe("dev and production flows", function integrationSuite() {
     const failureResponse = await handler(new Request("http://test.local/api/fail"));
     const failureText = await failureResponse.text();
     const pageResponse = await handler(new Request("http://test.local/docs/a/b"));
+    const docsBaseResponse = await handler(new Request("http://test.local/docs"));
     const pageText = await pageResponse.text();
+    const docsBaseText = await docsBaseResponse.text();
 
     expect(apiJson.id).toBe("123");
     expect(headResponse.status).toBe(200);
     expect(await headResponse.text()).toBe("");
     expect(optionsResponse.status).toBe(204);
     expect(optionsResponse.headers.get("allow")).toBe("GET, HEAD, OPTIONS");
+    expect(filesRoute?.segments.at(-1)).toEqual({
+      kind: "optionalCatchAll",
+      value: "[[...path]]",
+      param: "path",
+    });
     expect(rpcJson).toEqual({
       rpc: true,
       path: "/api/rpc/hello",
@@ -91,6 +111,7 @@ describe("dev and production flows", function integrationSuite() {
     expect(failureResponse.status).toBe(500);
     expect(failureText).toContain("Intentional API route failure");
     expect(pageText).toContain('<div id="root"></div>');
+    expect(docsBaseText).toContain('<div id="root"></div>');
     expect(join(exampleRoot, "dist", "server")).toContain("dist/server");
   });
 });
