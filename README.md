@@ -97,6 +97,24 @@ export function ALL(request: Request, context: ApiRouteContext): Response {
 
 ## Commands
 
+Create a new app:
+
+```bash
+npm exec now@latest -- create my-app
+cd my-app
+npm install
+npm run dev
+```
+
+If `now` is already installed globally or in a workspace, you can also run:
+
+```bash
+now create my-app
+```
+
+The starter includes a TypeScript `app/` directory, a client route, a nested route, a server
+health route, and scripts for `dev`, `build`, `start`, `typecheck`, and `verify`.
+
 ```bash
 npm run dev:example
 npm run build:example
@@ -107,6 +125,7 @@ npm run verify
 The package CLI supports:
 
 ```bash
+now create [directory]
 now dev [root] --port 3000
 now build [root]
 now start [root] --port 3000

@@ -50,10 +50,12 @@ export function createViteConfig(projectRoot: string, htmlInput?: string): Inlin
 
   if (htmlInput) {
     config.build = {
-      outDir: "dist/client",
+      outDir: resolve(root, "dist/client"),
       emptyOutDir: true,
       rollupOptions: {
-        input: htmlInput,
+        input: {
+          index: htmlInput,
+        },
       },
     };
   }

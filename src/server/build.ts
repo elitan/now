@@ -1,4 +1,5 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { build as esbuildBuild, type Plugin as EsbuildPlugin } from "esbuild";
 import { build as viteBuild } from "vite";
@@ -9,7 +10,7 @@ import { normalizePath, resolveRuntimeFile } from "../vite/paths";
 import { createViteConfig, resolveNowRuntimePaths } from "./vite-config";
 
 export async function buildProject(projectRoot: string): Promise<void> {
-  const root = resolve(projectRoot);
+  const root = await realpath(resolve(projectRoot));
   const runtime = resolveNowRuntimePaths();
   const generated = await writeGeneratedClientFiles(root, runtime.client);
   const distDirectory = join(root, "dist");
@@ -25,11 +26,15 @@ export async function buildProject(projectRoot: string): Promise<void> {
 }
 
 async function normalizeClientIndex(projectRoot: string, generatedHtml: string): Promise<void> {
-  const generatedRelativePath = relative(projectRoot, generatedHtml);
-  const generatedOutput = join(projectRoot, "dist", "client", generatedRelativePath);
-  const html = await readFile(generatedOutput, "utf8");
+  const indexOutput = join(projectRoot, "dist", "client", "index.html");
 
-  await writeFile(join(projectRoot, "dist", "client", "index.html"), html, "utf8");
+  if (!existsSync(indexOutput)) {
+    const generatedRelativePath = relative(projectRoot, generatedHtml);
+    const generatedOutput = join(projectRoot, "dist", "client", generatedRelativePath);
+    const html = await readFile(generatedOutput, "utf8");
+    await writeFile(indexOutput, html, "utf8");
+  }
+
   await rm(join(projectRoot, "dist", "client", ".now"), {
     recursive: true,
     force: true,
