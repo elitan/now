@@ -27,6 +27,8 @@ describe("dev and production flows", function integrationSuite() {
     const apiJson = (await apiResponse.json()) as { ok: boolean; runtime: string };
     const filesResponse = await fetch(`http://127.0.0.1:${server.port}/api/files`);
     const filesJson = (await filesResponse.json()) as { path: string[] };
+    const groupedResponse = await fetch(`http://127.0.0.1:${server.port}/api/grouped`);
+    const groupedJson = (await groupedResponse.json()) as { grouped: boolean; runtime: string };
     const pageResponse = await fetch(`http://127.0.0.1:${server.port}/about?q=dev`);
     const pageText = await pageResponse.text();
 
@@ -35,6 +37,10 @@ describe("dev and production flows", function integrationSuite() {
       runtime: "server",
     });
     expect(filesJson.path).toEqual([]);
+    expect(groupedJson).toEqual({
+      grouped: true,
+      runtime: "server",
+    });
     expect(pageText).toContain('<div id="root"></div>');
   });
 
@@ -52,6 +58,11 @@ describe("dev and production flows", function integrationSuite() {
     });
     const apiResponse = await handler(new Request("http://test.local/api/users/123"));
     const apiJson = (await apiResponse.json()) as { id: string };
+    const groupedResponse = await handler(new Request("http://test.local/api/grouped"));
+    const groupedJson = (await groupedResponse.json()) as {
+      grouped: boolean;
+      runtime: string;
+    };
     const rpcResponse = await handler(
       new Request("http://test.local/api/rpc/hello", {
         method: "POST",
@@ -72,6 +83,10 @@ describe("dev and production flows", function integrationSuite() {
       kind: "optionalCatchAll",
       value: "[[...path]]",
       param: "path",
+    });
+    expect(groupedJson).toEqual({
+      grouped: true,
+      runtime: "server",
     });
     expect(rpcJson).toEqual({
       rpc: true,

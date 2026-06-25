@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { relative, sep } from "node:path";
 import type { RouteSegment } from "./types";
 
@@ -95,15 +96,13 @@ export function routePathFromSegments(segments: RouteSegment[], prefix = ""): st
 }
 
 export function createRouteId(relativePath: string): string {
-  return relativePath
-    .replace(/\\/g, "/")
-    .replace(/\[\[\.\.\.([^\]]+)\]\]/g, "optional-catch-all-$1")
-    .replace(/\[\.\.\.([^\]]+)\]/g, "catch-all-$1")
-    .replace(/\[([^\]]+)\]/g, "dynamic-$1")
-    .replace(/\.[^.]+$/, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
+  const normalizedPath = relativePath.replace(/\\/g, "/").replace(/\.[^.]+$/, "");
+
+  if (!normalizedPath) {
+    return "";
+  }
+
+  return `route-${Buffer.from(normalizedPath, "utf8").toString("base64url")}`;
 }
 
 export function isRouteGroup(segment: string): boolean {

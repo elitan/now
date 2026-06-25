@@ -10,6 +10,7 @@ export default function RootLayout(props: PropsWithChildren): React.ReactElement
         <nav>
           <Link href="/">Home</Link>
           <Link href="/about?q=search">About</Link>
+          <Link href="/campaign">Campaign</Link>
           <Link href="/blog/alpha">Blog alpha</Link>
           <Link href="/docs">Docs index</Link>
           <Link href="/docs/guide/getting-started">Docs guide</Link>
