@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { scanFiles } from "../utils/files";
 import {
   createRouteId,
@@ -7,7 +7,7 @@ import {
   pathSegmentsFromRouteDirectory,
   routePathFromSegments,
 } from "./segments";
-import type { ApiRouteFile, ClientRouteFile, ScannedApp } from "./types";
+import type { ApiRouteFile, ClientRouteFile, RouteSegment, ScannedApp } from "./types";
 
 const PAGE_FILE = "page.tsx";
 const LAYOUT_FILE = "layout.tsx";
@@ -15,6 +15,11 @@ const LOADING_FILE = "loading.tsx";
 const ERROR_FILE = "error.tsx";
 const NOT_FOUND_FILE = "not-found.tsx";
 const API_ROUTE_FILE = "route.ts";
+
+interface ScannedRouteForConflict {
+  filePath: string;
+  segments: RouteSegment[];
+}
 
 export function scanApp(projectRoot: string): ScannedApp {
   const root = resolve(projectRoot);
@@ -46,13 +51,18 @@ export function scanClientRoutes(projectRoot: string): ClientRouteFile[] {
   assertNoClientPagesInsideApiDirectory(appDir, files);
 
   for (const file of files) {
-    if (!file.endsWith(PAGE_FILE) || isInsideApiDirectory(appDir, file)) {
+    if (basename(file) !== PAGE_FILE) {
       continue;
     }
 
     const routeDirectory = dirname(file);
     const rawSegments = pathSegmentsFromRouteDirectory(appDir, routeDirectory);
     const segments = parseRouteSegments(rawSegments);
+
+    if (isApiRouteSegments(segments)) {
+      continue;
+    }
+
     const relativePath = relative(appDir, file);
     const route: ClientRouteFile = {
       id: createRouteId(relativePath) || "root",
@@ -75,7 +85,7 @@ export function scanClientRoutes(projectRoot: string): ClientRouteFile[] {
     routes.push(route);
   }
 
-  assertUniqueRoutePatterns(appDir, routes, "client");
+  assertNoRouteConflicts(routes, "client");
 
   return routes;
 }
@@ -83,36 +93,39 @@ export function scanClientRoutes(projectRoot: string): ClientRouteFile[] {
 export function scanApiRoutes(projectRoot: string): ApiRouteFile[] {
   const root = resolve(projectRoot);
   const appDir = join(root, "app");
-  const apiDir = join(appDir, "api");
 
-  if (!existsSync(apiDir)) {
+  if (!existsSync(appDir)) {
     return [];
   }
 
   const routes: ApiRouteFile[] = [];
-  const files = scanFiles(apiDir);
+  const files = scanFiles(appDir);
   assertNoClientPagesInsideApiDirectory(appDir, files);
 
   for (const file of files) {
-    if (!file.endsWith(API_ROUTE_FILE)) {
+    if (basename(file) !== API_ROUTE_FILE) {
       continue;
     }
 
     const routeDirectory = dirname(file);
-    const rawSegments = pathSegmentsFromRouteDirectory(apiDir, routeDirectory);
-    const routePathSegments = parseRouteSegments(rawSegments);
-    const runtimeSegments = parseRouteSegments(["api", ...rawSegments]);
-    const relativePath = relative(apiDir, file);
+    const rawSegments = pathSegmentsFromRouteDirectory(appDir, routeDirectory);
+    const segments = parseRouteSegments(rawSegments);
+
+    if (!isApiRouteSegments(segments)) {
+      continue;
+    }
+
+    const relativePath = relative(appDir, file);
 
     routes.push({
-      id: createRouteId(`api/${relativePath}`) || "api-root",
-      routePath: routePathFromSegments(routePathSegments, "/api"),
+      id: createRouteId(relativePath) || "api-root",
+      routePath: routePathFromSegments(segments),
       filePath: file,
-      segments: runtimeSegments,
+      segments,
     });
   }
 
-  assertUniqueRoutePatterns(appDir, routes, "API");
+  assertNoRouteConflicts(routes, "API");
 
   return routes;
 }
@@ -169,16 +182,14 @@ function collectAncestorDirectories(appDir: string, routeDirectory: string): str
   return directories.reverse();
 }
 
-function isInsideApiDirectory(appDir: string, file: string): boolean {
-  const apiRelativePath = relative(join(appDir, "api"), file);
-  return (
-    Boolean(apiRelativePath) && !apiRelativePath.startsWith("..") && !isAbsolute(apiRelativePath)
-  );
+function isApiRouteSegments(segments: RouteSegment[]): boolean {
+  const firstSegment = segments[0];
+  return firstSegment?.kind === "static" && firstSegment.value === "api";
 }
 
 function assertNoClientPagesInsideApiDirectory(appDir: string, files: string[]): void {
   for (const file of files) {
-    if (!file.endsWith(PAGE_FILE) || !isInsideApiDirectory(appDir, file)) {
+    if (basename(file) !== PAGE_FILE || !isInsidePhysicalApiDirectory(appDir, file)) {
       continue;
     }
 
@@ -191,33 +202,39 @@ function assertNoClientPagesInsideApiDirectory(appDir: string, files: string[]):
   }
 }
 
-function assertUniqueRoutePatterns(
-  appDir: string,
-  routes: Array<ClientRouteFile | ApiRouteFile>,
-  kind: "client" | "API",
+function isInsidePhysicalApiDirectory(appDir: string, file: string): boolean {
+  const apiRelativePath = relative(join(appDir, "api"), file);
+  return (
+    Boolean(apiRelativePath) && !apiRelativePath.startsWith("..") && !isAbsolute(apiRelativePath)
+  );
+}
+
+function assertNoRouteConflicts(
+  routes: ScannedRouteForConflict[],
+  routeType: "client" | "API",
 ): void {
-  const seen = new Map<string, ClientRouteFile | ApiRouteFile>();
+  const seenRoutes = new Map<string, ScannedRouteForConflict>();
 
   for (const route of routes) {
-    const key = routePatternKey(route);
-    const existing = seen.get(key);
+    const key = routeConflictKey(route.segments);
+    const previous = seenRoutes.get(key);
 
-    if (existing) {
+    if (previous) {
       throw new Error(
         [
-          `Conflicting ${kind} routes resolve to the same URL shape:`,
-          `${relative(appDir, existing.filePath)} and ${relative(appDir, route.filePath)}.`,
-          "Rename one route segment or remove the route group conflict.",
-        ].join(" "),
+          `Conflicting ${routeType} routes resolve to ${describeRouteShape(route.segments)}.`,
+          previous.filePath,
+          route.filePath,
+        ].join("\n"),
       );
     }
 
-    seen.set(key, route);
+    seenRoutes.set(key, route);
   }
 }
 
-function routePatternKey(route: ClientRouteFile | ApiRouteFile): string {
-  return route.segments
+function routeConflictKey(segments: RouteSegment[]): string {
+  return segments
     .map(function mapSegment(segment) {
       if (segment.kind === "static") {
         return `static:${segment.value}`;
@@ -226,4 +243,28 @@ function routePatternKey(route: ClientRouteFile | ApiRouteFile): string {
       return segment.kind;
     })
     .join("/");
+}
+
+function describeRouteShape(segments: RouteSegment[]): string {
+  const parts = segments.map(function mapSegment(segment) {
+    if (segment.kind === "static") {
+      return segment.value;
+    }
+
+    if (segment.kind === "dynamic") {
+      return ":param";
+    }
+
+    if (segment.kind === "optionalCatchAll") {
+      return "*param?";
+    }
+
+    return "*param";
+  });
+
+  if (parts.length === 0) {
+    return "/";
+  }
+
+  return `/${parts.join("/")}`;
 }

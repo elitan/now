@@ -23,6 +23,10 @@ app/
   page.tsx
   about/
     page.tsx
+  (marketing)/
+    layout.tsx
+    campaign/
+      page.tsx
   blog/
     [slug]/
       page.tsx
@@ -32,15 +36,26 @@ app/
   api/
     health/
       route.ts
+  (internal)/
+    api/
+      grouped/
+        route.ts
 ```
 
 Client routes:
 
 - `app/page.tsx` maps to `/`.
 - `app/about/page.tsx` maps to `/about`.
+- `app/(marketing)/campaign/page.tsx` maps to `/campaign`.
 - `app/blog/[slug]/page.tsx` maps to `/blog/:slug`.
 - `app/docs/[...slug]/page.tsx` maps to `/docs/*slug`.
 - `app/docs/[[...slug]]/page.tsx` maps to `/docs/*slug?` and also matches `/docs`.
+
+Route groups:
+
+- Folder names wrapped in parentheses are organizational and do not add URL segments.
+- Group folders may contain route conventions such as `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, and `route.ts`.
+- Routes in different groups must not resolve to the same path.
 
 Server routes:
 
@@ -51,6 +66,7 @@ export function GET(request: Request): Response {
 ```
 
 Every `app/api/**/route.ts` file is server-only. Handlers may export `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, and `ALL`. If `GET` is present and `HEAD` is not, `now` runs the `GET` handler for `HEAD` requests and removes the response body. If `OPTIONS` is not exported, `now` generates a 204 response with an `Allow` header from the available handlers. `ALL` remains the fallback for adapter-style routes when a specific method export is not present.
+Route groups may appear before or inside `api`, so `app/(internal)/api/grouped/route.ts` maps to `/api/grouped`.
 
 ## Runtime APIs
 

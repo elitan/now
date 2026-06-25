@@ -1,10 +1,16 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { matchRoute, rankRoutes } from "../../src/routing/matcher";
 import { scanApiRoutes, scanClientRoutes } from "../../src/routing/scanner";
-import { parseRouteSegments, routePathFromSegments } from "../../src/routing/segments";
+import {
+  createRouteId,
+  parseRouteSegments,
+  routePathFromSegments,
+} from "../../src/routing/segments";
 import { createTempProject, removeTempProject, writeProjectFile } from "../helpers/fixtures";
 
 const tempProjects: string[] = [];
+const PAGE_MODULE = "export default function Page(){ return null }";
+const API_ROUTE_MODULE = "export function GET(){ return new Response() }";
 
 afterEach(function cleanupProjects() {
   for (const project of tempProjects) {
@@ -55,32 +61,16 @@ describe("file route scanning", function routeScanningSuite() {
     tempProjects.push(root);
 
     writeProjectFile(root, "app/layout.tsx", "export default function Layout(){ return null }");
-    writeProjectFile(root, "app/page.tsx", "export default function Page(){ return null }");
+    writeProjectFile(root, "app/page.tsx", PAGE_MODULE);
     writeProjectFile(
       root,
       "app/blog/layout.tsx",
       "export default function Layout(){ return null }",
     );
-    writeProjectFile(
-      root,
-      "app/blog/[slug]/page.tsx",
-      "export default function Page(){ return null }",
-    );
-    writeProjectFile(
-      root,
-      "app/docs/[...slug]/page.tsx",
-      "export default function Page(){ return null }",
-    );
-    writeProjectFile(
-      root,
-      "app/shop/[[...slug]]/page.tsx",
-      "export default function Page(){ return null }",
-    );
-    writeProjectFile(
-      root,
-      "app/(group)/about/page.tsx",
-      "export default function Page(){ return null }",
-    );
+    writeProjectFile(root, "app/blog/[slug]/page.tsx", PAGE_MODULE);
+    writeProjectFile(root, "app/docs/[...slug]/page.tsx", PAGE_MODULE);
+    writeProjectFile(root, "app/shop/[[...slug]]/page.tsx", PAGE_MODULE);
+    writeProjectFile(root, "app/(group)/about/page.tsx", PAGE_MODULE);
 
     const routes = scanClientRoutes(root);
     const paths = routes.map(function mapRoute(route) {
@@ -96,30 +86,63 @@ describe("file route scanning", function routeScanningSuite() {
     expect(blogRoute?.layouts).toHaveLength(2);
   });
 
+  it("scans grouped page routes with grouped conventions", function scanGroupedPageRoutes() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(root, "app/layout.tsx", "export default function Layout(){ return null }");
+    writeProjectFile(
+      root,
+      "app/(marketing)/layout.tsx",
+      "export default function Layout(){ return null }",
+    );
+    writeProjectFile(
+      root,
+      "app/(marketing)/loading.tsx",
+      "export default function Loading(){ return null }",
+    );
+    writeProjectFile(
+      root,
+      "app/(marketing)/error.tsx",
+      "export default function Error(){ return null }",
+    );
+    writeProjectFile(root, "app/(marketing)/campaign/page.tsx", PAGE_MODULE);
+
+    const routes = scanClientRoutes(root);
+    const route = routes.find(function findCampaign(candidate) {
+      return candidate.routePath === "/campaign";
+    });
+
+    expect(route?.layouts).toHaveLength(2);
+    expect(normalizeTestPath(route?.layouts[1] ?? "")).toContain("app/(marketing)/layout.tsx");
+    expect(normalizeTestPath(route?.loading ?? "")).toContain("app/(marketing)/loading.tsx");
+    expect(normalizeTestPath(route?.error ?? "")).toContain("app/(marketing)/error.tsx");
+  });
+
+  it("excludes grouped client pages that resolve under api", function excludeApiClientPages() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(root, "app/(marketing)/about/page.tsx", PAGE_MODULE);
+    writeProjectFile(root, "app/(internal)/api/docs/page.tsx", PAGE_MODULE);
+
+    const routes = scanClientRoutes(root);
+    const paths = routes.map(function mapRoute(route) {
+      return route.routePath;
+    });
+
+    expect(paths).toContain("/about");
+    expect(paths).not.toContain("/api/docs");
+  });
+
   it("scans dynamic, catch-all, and optional catch-all API routes", function scanApi() {
     const root = createTempProject();
     tempProjects.push(root);
 
-    writeProjectFile(
-      root,
-      "app/api/health/route.ts",
-      "export function GET(){ return new Response() }",
-    );
-    writeProjectFile(
-      root,
-      "app/api/users/[id]/route.ts",
-      "export function GET(){ return new Response() }",
-    );
-    writeProjectFile(
-      root,
-      "app/api/files/[...path]/route.ts",
-      "export function GET(){ return new Response() }",
-    );
-    writeProjectFile(
-      root,
-      "app/api/docs/[[...path]]/route.ts",
-      "export function GET(){ return new Response() }",
-    );
+    writeProjectFile(root, "app/api/health/route.ts", API_ROUTE_MODULE);
+    writeProjectFile(root, "app/api/users/[id]/route.ts", API_ROUTE_MODULE);
+    writeProjectFile(root, "app/api/files/[...path]/route.ts", API_ROUTE_MODULE);
+    writeProjectFile(root, "app/api/docs/[[...path]]/route.ts", API_ROUTE_MODULE);
 
     const routes = scanApiRoutes(root);
     const paths = routes.map(function mapRoute(route) {
@@ -185,6 +208,62 @@ describe("file route scanning", function routeScanningSuite() {
       scanApiRoutes(root);
     }).toThrowError(/Conflicting API routes/);
   });
+
+  it("scans grouped API routes that resolve under api", function scanGroupedApiRoutes() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(root, "app/(internal)/api/grouped/route.ts", API_ROUTE_MODULE);
+    writeProjectFile(root, "app/api/(v1)/users/[id]/route.ts", API_ROUTE_MODULE);
+    writeProjectFile(root, "app/(internal)/status/route.ts", API_ROUTE_MODULE);
+
+    const routes = scanApiRoutes(root);
+    const paths = routes.map(function mapRoute(route) {
+      return route.routePath;
+    });
+
+    expect(paths).toEqual(expect.arrayContaining(["/api/grouped", "/api/users/:id"]));
+    expect(paths).not.toContain("/status");
+  });
+
+  it("rejects grouped client routes with duplicate resolved paths", function duplicateClientRoutes() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(root, "app/(a)/about/page.tsx", PAGE_MODULE);
+    writeProjectFile(root, "app/(b)/about/page.tsx", PAGE_MODULE);
+
+    const message = captureErrorMessage(function scanRoutes() {
+      scanClientRoutes(root);
+    });
+
+    expect(message).toContain("Conflicting client routes resolve to /about.");
+    expect(normalizeTestPath(message)).toContain("app/(a)/about/page.tsx");
+    expect(normalizeTestPath(message)).toContain("app/(b)/about/page.tsx");
+  });
+
+  it("rejects grouped API routes with duplicate dynamic shapes", function duplicateApiRoutes() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(root, "app/(a)/api/users/[id]/route.ts", API_ROUTE_MODULE);
+    writeProjectFile(root, "app/(b)/api/users/[slug]/route.ts", API_ROUTE_MODULE);
+
+    const message = captureErrorMessage(function scanRoutes() {
+      scanApiRoutes(root);
+    });
+
+    expect(message).toContain("Conflicting API routes resolve to /api/users/:param.");
+    expect(normalizeTestPath(message)).toContain("app/(a)/api/users/[id]/route.ts");
+    expect(normalizeTestPath(message)).toContain("app/(b)/api/users/[slug]/route.ts");
+  });
+
+  it("creates collision-free route IDs from physical paths", function collisionFreeRouteIds() {
+    expect(createRouteId("api/(v1)/users/route.ts")).not.toBe(
+      createRouteId("api/route-group-v1/users/route.ts"),
+    );
+    expect(createRouteId("foo-bar/page.tsx")).not.toBe(createRouteId("foo/bar/page.tsx"));
+  });
 });
 
 describe("route matching", function routeMatchingSuite() {
@@ -192,21 +271,9 @@ describe("route matching", function routeMatchingSuite() {
     const root = createTempProject();
     tempProjects.push(root);
 
-    writeProjectFile(
-      root,
-      "app/blog/[slug]/page.tsx",
-      "export default function Page(){ return null }",
-    );
-    writeProjectFile(
-      root,
-      "app/blog/settings/page.tsx",
-      "export default function Page(){ return null }",
-    );
-    writeProjectFile(
-      root,
-      "app/blog/[...slug]/page.tsx",
-      "export default function Page(){ return null }",
-    );
+    writeProjectFile(root, "app/blog/[slug]/page.tsx", PAGE_MODULE);
+    writeProjectFile(root, "app/blog/settings/page.tsx", PAGE_MODULE);
+    writeProjectFile(root, "app/blog/[...slug]/page.tsx", PAGE_MODULE);
 
     const routes = scanClientRoutes(root);
     const staticMatch = matchRoute(routes, "/blog/settings");
@@ -340,3 +407,17 @@ describe("route matching", function routeMatchingSuite() {
     expect(match?.params.slug).toEqual(["foo"]);
   });
 });
+
+function normalizeTestPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/");
+}
+
+function captureErrorMessage(callback: () => void): string {
+  try {
+    callback();
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  throw new Error("Expected callback to throw.");
+}
