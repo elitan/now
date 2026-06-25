@@ -13,6 +13,12 @@ import {
   type RunningServer,
   writeWebResponse,
 } from "./http";
+import {
+  applyHeadersToNodeResponse,
+  installNodeResponseHeaderOverride,
+  mergeResponseHeaders,
+} from "./headers";
+import { dispatchProxyRequest, findProxyFile, type ProxyModule, type RuntimeProxy } from "./proxy";
 import type { StartOptions } from "./prod";
 import { createViteConfig, resolveNowRuntimePaths } from "./vite-config";
 
@@ -71,22 +77,48 @@ async function handleDevRequest(
 ): Promise<void> {
   try {
     const request = createWebRequest(nodeRequest, port);
-    const frameworkResponse = await tryHandleFrameworkRequest(projectRoot, vite, request);
+    const proxyResult = await dispatchProxyRequest(request, createDevProxy(projectRoot, vite));
 
-    if (frameworkResponse) {
-      await writeWebResponse(nodeResponse, frameworkResponse);
+    if (proxyResult.kind === "response") {
+      await writeWebResponse(nodeResponse, proxyResult.response);
       return;
     }
 
-    const url = new URL(request.url);
+    const frameworkResponse = await tryHandleFrameworkRequest(
+      projectRoot,
+      vite,
+      proxyResult.request,
+    );
+
+    if (frameworkResponse) {
+      await writeWebResponse(
+        nodeResponse,
+        mergeResponseHeaders(frameworkResponse, proxyResult.responseHeaders),
+      );
+      return;
+    }
+
+    const url = new URL(proxyResult.request.url);
 
     if (shouldUseViteMiddleware(url.pathname)) {
-      const handled = await runViteMiddleware(vite, nodeRequest, nodeResponse);
+      const restoreProxyHeaderOverride = installNodeResponseHeaderOverride(
+        nodeResponse,
+        proxyResult.responseHeaders,
+      );
+
+      let handled = false;
+
+      try {
+        handled = await runViteMiddleware(vite, nodeRequest, nodeResponse, proxyResult.request);
+      } finally {
+        restoreProxyHeaderOverride();
+      }
 
       if (handled) {
         return;
       }
 
+      applyHeadersToNodeResponse(nodeResponse, proxyResult.responseHeaders);
       nodeResponse.statusCode = 404;
       nodeResponse.end("Not Found");
       return;
@@ -96,11 +128,14 @@ async function handleDevRequest(
     const transformed = await vite.transformIndexHtml(url.pathname, html);
     await writeWebResponse(
       nodeResponse,
-      new Response(transformed, {
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-        },
-      }),
+      mergeResponseHeaders(
+        new Response(transformed, {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+          },
+        }),
+        proxyResult.responseHeaders,
+      ),
     );
   } catch (error) {
     vite.ssrFixStacktrace(error as Error);
@@ -133,6 +168,21 @@ function createDevApiRoutes(projectRoot: string, vite: ViteDevServer): RuntimeAp
   });
 }
 
+function createDevProxy(projectRoot: string, vite: ViteDevServer): RuntimeProxy | undefined {
+  const filePath = findProxyFile(projectRoot);
+
+  if (!filePath) {
+    return undefined;
+  }
+
+  return {
+    filePath,
+    load: function loadProxyModule(): Promise<ProxyModule> {
+      return vite.ssrLoadModule(filePath) as Promise<ProxyModule>;
+    },
+  };
+}
+
 function shouldUseViteMiddleware(pathname: string): boolean {
   return (
     pathname.startsWith("/@vite") ||
@@ -150,10 +200,16 @@ function runViteMiddleware(
   vite: ViteDevServer,
   request: IncomingMessage,
   response: ServerResponse,
+  webRequest: Request,
 ): Promise<boolean> {
+  const originalUrl = request.url;
+  request.url = toNodeRequestUrl(webRequest);
+
   return new Promise<boolean>(function waitForMiddleware(resolveMiddleware, rejectMiddleware) {
     response.on("error", rejectMiddleware);
     vite.middlewares(request, response, function handleNext(error?: unknown) {
+      request.url = originalUrl;
+
       if (error) {
         rejectMiddleware(error);
         return;
@@ -162,4 +218,10 @@ function runViteMiddleware(
       resolveMiddleware(response.writableEnded);
     });
   });
+}
+
+function toNodeRequestUrl(request: Request): string {
+  const url = new URL(request.url);
+
+  return `${url.pathname}${url.search}`;
 }

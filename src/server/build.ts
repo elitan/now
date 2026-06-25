@@ -7,6 +7,7 @@ import { scanApiRoutes } from "../routing/scanner";
 import type { GeneratedServerRoute, ServerBuildManifest } from "../routing/types";
 import { writeGeneratedClientFiles } from "../vite/generated";
 import { normalizePath, resolveRuntimeFile } from "../vite/paths";
+import { findProxyFile } from "./proxy";
 import { createViteConfig, resolveNowRuntimePaths } from "./vite-config";
 
 export async function buildProject(projectRoot: string): Promise<void> {
@@ -46,6 +47,7 @@ async function buildServer(projectRoot: string): Promise<void> {
   const routeDirectory = join(serverDirectory, "routes");
   const apiRoutes = scanApiRoutes(projectRoot);
   const generatedRoutes: GeneratedServerRoute[] = [];
+  const proxyFile = findProxyFile(projectRoot);
 
   await mkdir(routeDirectory, {
     recursive: true,
@@ -66,6 +68,14 @@ async function buildServer(projectRoot: string): Promise<void> {
   const manifest: ServerBuildManifest = {
     apiRoutes: generatedRoutes,
   };
+
+  if (proxyFile) {
+    const modulePath = "proxy.mjs";
+    await bundleEntry(proxyFile, join(serverDirectory, modulePath));
+    manifest.proxy = {
+      modulePath,
+    };
+  }
 
   await writeFile(
     join(serverDirectory, "manifest.json"),
