@@ -43,10 +43,10 @@ export function matchSegments(
       return undefined;
     }
 
-    if (routeSegment.kind === "catchAll") {
+    if (routeSegment.kind === "catchAll" || routeSegment.kind === "optionalCatchAll") {
       const rest = pathnameSegments.slice(pathIndex);
 
-      if (rest.length === 0) {
+      if (routeSegment.kind === "catchAll" && rest.length === 0) {
         return undefined;
       }
 
@@ -90,32 +90,54 @@ export function splitPathname(pathname: string): string[] {
 }
 
 function compareRoutes(left: MatchableRoute, right: MatchableRoute): number {
-  const leftScore = scoreRoute(left.segments);
-  const rightScore = scoreRoute(right.segments);
+  const segmentComparison = compareSegmentSpecificity(left.segments, right.segments);
 
-  if (leftScore !== rightScore) {
-    return rightScore - leftScore;
+  if (segmentComparison !== 0) {
+    return segmentComparison;
   }
 
-  if (left.segments.length !== right.segments.length) {
-    return right.segments.length - left.segments.length;
+  return routeSignature(left.segments).localeCompare(routeSignature(right.segments));
+}
+
+function compareSegmentSpecificity(left: RouteSegment[], right: RouteSegment[]): number {
+  const maxLength = Math.max(left.length, right.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftPriority = segmentPriority(left[index]);
+    const rightPriority = segmentPriority(right[index]);
+
+    if (leftPriority !== rightPriority) {
+      return rightPriority - leftPriority;
+    }
   }
 
   return 0;
 }
 
-function scoreRoute(segments: RouteSegment[]): number {
-  let score = 0;
-
-  for (const segment of segments) {
-    if (segment.kind === "static") {
-      score += 10;
-    } else if (segment.kind === "dynamic") {
-      score += 5;
-    } else {
-      score += 1;
-    }
+function segmentPriority(segment: RouteSegment | undefined): number {
+  if (!segment) {
+    return 1;
   }
 
-  return score;
+  if (segment.kind === "static") {
+    return 4;
+  }
+
+  if (segment.kind === "dynamic") {
+    return 3;
+  }
+
+  if (segment.kind === "catchAll") {
+    return 2;
+  }
+
+  return 0;
+}
+
+function routeSignature(segments: RouteSegment[]): string {
+  return segments
+    .map(function mapSegment(segment) {
+      return `${segment.kind}:${segment.value}`;
+    })
+    .join("/");
 }

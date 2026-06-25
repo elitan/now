@@ -11,7 +11,8 @@ export default function RootLayout(props: PropsWithChildren): React.ReactElement
           <Link href="/">Home</Link>
           <Link href="/about?q=search">About</Link>
           <Link href="/blog/alpha">Blog alpha</Link>
-          <Link href="/docs/guide/getting-started">Docs</Link>
+          <Link href="/docs">Docs index</Link>
+          <Link href="/docs/guide/getting-started">Docs guide</Link>
           <Link href="/broken">Broken</Link>
         </nav>
       </header>

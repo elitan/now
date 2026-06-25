@@ -34,9 +34,15 @@ try {
   await waitForServer(port);
   const response = await fetch(`http://127.0.0.1:${port}/api/health`);
   const json = (await response.json()) as { ok: boolean };
+  const filesResponse = await fetch(`http://127.0.0.1:${port}/api/files`);
+  const filesJson = (await filesResponse.json()) as { path: string[] };
 
   if (!json.ok) {
     throw new Error("Bun runtime did not serve the API route.");
+  }
+
+  if (filesJson.path.length !== 0) {
+    throw new Error("Bun runtime did not serve the optional catch-all API route.");
   }
 } finally {
   child.kill("SIGTERM");
