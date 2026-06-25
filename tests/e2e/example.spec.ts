@@ -32,10 +32,29 @@ test("renders dynamic routes and nested layouts", async function dynamicRoute({ 
   await expect(page.getByTestId("blog-slug")).toHaveText("alpha");
 });
 
-test("handles catch-all routes on hard refresh", async function catchAllRoute({ page }) {
+test("handles optional catch-all routes on hard refresh", async function catchAllRoute({ page }) {
+  await page.goto("/docs");
+
+  await expect(page.getByTestId("docs-page")).toBeVisible();
+  await expect(page.getByTestId("docs-slug")).toHaveText("index");
+
   await page.goto("/docs/guide/getting-started");
 
   await expect(page.getByTestId("docs-page")).toBeVisible();
+  await expect(page.getByTestId("docs-slug")).toHaveText("guide/getting-started");
+});
+
+test("navigates to optional catch-all routes on the client", async function optionalCatchAllNavigation({
+  page,
+}) {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Docs index" }).click();
+
+  await expect(page).toHaveURL(/\/docs$/);
+  await expect(page.getByTestId("docs-slug")).toHaveText("index");
+
+  await page.getByRole("link", { name: "Docs guide" }).click();
+  await expect(page).toHaveURL(/\/docs\/guide\/getting-started$/);
   await expect(page.getByTestId("docs-slug")).toHaveText("guide/getting-started");
 });
 
@@ -53,12 +72,15 @@ test("serves dynamic and catch-all API routes in production", async function api
 }) {
   const userResponse = await request.get("/api/users/42");
   const userJson = (await userResponse.json()) as { id: string };
+  const filesBaseResponse = await request.get("/api/files");
   const filesResponse = await request.get("/api/files/a/b/c");
   const rpcResponse = await request.post("/api/rpc/e2e");
+  const filesBaseJson = (await filesBaseResponse.json()) as { path: string[] };
   const filesJson = (await filesResponse.json()) as { path: string[] };
   const rpcJson = (await rpcResponse.json()) as { rpc: boolean; path: string; params: string[] };
 
   expect(userJson.id).toBe("42");
+  expect(filesBaseJson.path).toEqual([]);
   expect(filesJson.path).toEqual(["a", "b", "c"]);
   expect(rpcJson).toEqual({
     rpc: true,

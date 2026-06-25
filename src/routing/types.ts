@@ -1,4 +1,4 @@
-export type SegmentKind = "static" | "dynamic" | "catchAll";
+export type SegmentKind = "static" | "dynamic" | "catchAll" | "optionalCatchAll";
 
 export interface RouteSegment {
   kind: SegmentKind;

@@ -19,6 +19,17 @@ export function parseRouteSegments(rawSegments: string[]): RouteSegment[] {
       continue;
     }
 
+    if (rawSegment.startsWith("[[...") && rawSegment.endsWith("]]")) {
+      const param = rawSegment.slice(5, -2);
+      validateParam(param, rawSegment);
+      segments.push({
+        kind: "optionalCatchAll",
+        value: rawSegment,
+        param,
+      });
+      continue;
+    }
+
     if (rawSegment.startsWith("[...") && rawSegment.endsWith("]")) {
       const param = rawSegment.slice(4, -1);
       validateParam(param, rawSegment);
@@ -47,6 +58,7 @@ export function parseRouteSegments(rawSegments: string[]): RouteSegment[] {
     });
   }
 
+  validateCatchAllSegmentsAreTerminal(segments);
   return segments;
 }
 
@@ -61,6 +73,11 @@ export function routePathFromSegments(segments: RouteSegment[], prefix = ""): st
 
     if (segment.kind === "dynamic") {
       parts.push(`:${segment.param}`);
+      continue;
+    }
+
+    if (segment.kind === "optionalCatchAll") {
+      parts.push(`*${segment.param}?`);
       continue;
     }
 
@@ -80,6 +97,9 @@ export function routePathFromSegments(segments: RouteSegment[], prefix = ""): st
 export function createRouteId(relativePath: string): string {
   return relativePath
     .replace(/\\/g, "/")
+    .replace(/\[\[\.\.\.([^\]]+)\]\]/g, "optional-catch-all-$1")
+    .replace(/\[\.\.\.([^\]]+)\]/g, "catch-all-$1")
+    .replace(/\[([^\]]+)\]/g, "dynamic-$1")
     .replace(/\.[^.]+$/, "")
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -94,4 +114,22 @@ function validateParam(param: string, segment: string): void {
   if (!param || param.includes("/") || param.includes("[") || param.includes("]")) {
     throw new Error(`Invalid route segment "${segment}".`);
   }
+}
+
+function validateCatchAllSegmentsAreTerminal(segments: RouteSegment[]): void {
+  const catchAllSegment = segments.find(function findCatchAll(segment) {
+    return segment.kind === "catchAll" || segment.kind === "optionalCatchAll";
+  });
+
+  if (!catchAllSegment) {
+    return;
+  }
+
+  if (segments.indexOf(catchAllSegment) === segments.length - 1) {
+    return;
+  }
+
+  throw new Error(
+    `Catch-all route segment "${catchAllSegment.value}" must be the final route segment.`,
+  );
 }

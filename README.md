@@ -8,7 +8,7 @@ This is a v0 prototype. It intentionally does not implement SSR or React Server 
 
 - TypeScript-only user apps.
 - `app/` file-based client router.
-- Static, dynamic, and catch-all routes.
+- Static, dynamic, catch-all, and optional catch-all routes.
 - Mandatory nested `layout.tsx` support.
 - `loading.tsx`, `error.tsx`, and `not-found.tsx` conventions.
 - Server routes under `app/api` with standard `Request` and `Response`.
@@ -27,7 +27,7 @@ app/
     [slug]/
       page.tsx
   docs/
-    [...slug]/
+    [[...slug]]/
       page.tsx
   api/
     health/
@@ -40,6 +40,7 @@ Client routes:
 - `app/about/page.tsx` maps to `/about`.
 - `app/blog/[slug]/page.tsx` maps to `/blog/:slug`.
 - `app/docs/[...slug]/page.tsx` maps to `/docs/*slug`.
+- `app/docs/[[...slug]]/page.tsx` maps to `/docs/*slug?` and also matches `/docs`.
 
 Server routes:
 
@@ -122,4 +123,5 @@ Nitro was evaluated as the server layer. The current implementation uses a minim
 - No React Server Components.
 - `loading.tsx` is used as route-load pending UI, not streaming UI.
 - Catch-all params are exposed as arrays through `useParams`.
+- Optional catch-all params are exposed as empty arrays for the base path.
 - Production server output expects the project dependencies to be installed.
