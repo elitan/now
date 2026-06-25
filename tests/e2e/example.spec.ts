@@ -24,6 +24,14 @@ test("navigates with search params and client history", async function aboutNavi
   await expect(page.getByTestId("home-page")).toBeVisible();
 });
 
+test("renders grouped client routes and layouts", async function groupedRoute({ page }) {
+  await page.goto("/campaign");
+
+  await expect(page.getByTestId("root-layout")).toBeVisible();
+  await expect(page.getByTestId("marketing-layout")).toBeVisible();
+  await expect(page.getByTestId("campaign-page")).toBeVisible();
+});
+
 test("renders dynamic routes and nested layouts", async function dynamicRoute({ page }) {
   await page.goto("/blog/alpha");
 
@@ -73,6 +81,8 @@ test("serves dynamic and catch-all API routes in production", async function api
   const userResponse = await request.get("/api/users/42");
   const userJson = (await userResponse.json()) as { id: string };
   const filesBaseResponse = await request.get("/api/files");
+  const groupedResponse = await request.get("/api/grouped");
+  const groupedJson = (await groupedResponse.json()) as { grouped: boolean; runtime: string };
   const filesResponse = await request.get("/api/files/a/b/c");
   const rpcResponse = await request.post("/api/rpc/e2e");
   const filesBaseJson = (await filesBaseResponse.json()) as { path: string[] };
@@ -81,6 +91,10 @@ test("serves dynamic and catch-all API routes in production", async function api
 
   expect(userJson.id).toBe("42");
   expect(filesBaseJson.path).toEqual([]);
+  expect(groupedJson).toEqual({
+    grouped: true,
+    runtime: "server",
+  });
   expect(filesJson.path).toEqual(["a", "b", "c"]);
   expect(rpcJson).toEqual({
     rpc: true,
