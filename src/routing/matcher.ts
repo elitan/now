@@ -43,14 +43,15 @@ export function matchSegments(
       return undefined;
     }
 
-    if (routeSegment.kind === "catchAll") {
+    if (routeSegment.kind === "catchAll" || routeSegment.kind === "optionalCatchAll") {
       const rest = pathnameSegments.slice(pathIndex);
 
-      if (rest.length === 0) {
+      if (routeSegment.kind === "catchAll" && rest.length === 0) {
         return undefined;
       }
 
-      params[routeSegment.param ?? "slug"] = rest.map(decodeURIComponent);
+      params[routeSegment.param ?? "slug"] =
+        rest.length > 0 ? rest.map(decodeURIComponent) : undefined;
       pathIndex = pathnameSegments.length;
       break;
     }
@@ -112,8 +113,10 @@ function scoreRoute(segments: RouteSegment[]): number {
       score += 10;
     } else if (segment.kind === "dynamic") {
       score += 5;
-    } else {
+    } else if (segment.kind === "catchAll") {
       score += 1;
+    } else {
+      score -= 1;
     }
   }
 

@@ -58,11 +58,19 @@ async function respond(
     const webResponse = await handler(webRequest);
     await writeWebResponse(response, webResponse);
   } catch (error) {
-    const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
-    response.statusCode = 500;
-    response.setHeader("content-type", "text/plain; charset=utf-8");
-    response.end(message);
+    await writeWebResponse(response, createServerErrorResponse(error));
   }
+}
+
+export function createServerErrorResponse(error: unknown): Response {
+  const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+
+  return new Response(message, {
+    status: 500,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+    },
+  });
 }
 
 export function createWebRequest(request: IncomingMessage, port: number): Request {

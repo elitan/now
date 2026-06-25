@@ -1,4 +1,5 @@
 import { matchRoute } from "../routing/matcher";
+import type { RouteParamsForPath } from "../routing/segments";
 import type { ApiRouteFile, RouteParams } from "../routing/types";
 
 export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
@@ -6,20 +7,35 @@ export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "O
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 export type AnyHttpMethod = "ALL";
 
-export interface ApiRouteContext {
-  params: RouteParams;
-}
+export type ApiRouteParams<Path extends string> = RouteParamsForPath<Path>;
 
-export type ApiRouteHandler = (
+export type ApiRouteContext<TPathOrParams = RouteParams> = {
+  params: TPathOrParams extends string ? ApiRouteParams<TPathOrParams> : TPathOrParams;
+};
+
+export type ApiRouteHandler<TPathOrParams = RouteParams> = (
   request: Request,
-  context: ApiRouteContext,
+  context: ApiRouteContext<TPathOrParams>,
 ) => Response | Promise<Response> | unknown | Promise<unknown>;
 
-export type ApiRouteModule = Partial<Record<HttpMethod | AnyHttpMethod, ApiRouteHandler>>;
+export type ApiRouteModule<TPathOrParams = RouteParams> = Partial<
+  Record<HttpMethod | AnyHttpMethod, ApiRouteHandler<TPathOrParams>>
+>;
 
 export interface RuntimeApiRoute extends ApiRouteFile {
   load: () => Promise<ApiRouteModule>;
 }
+
+type ApiMethodResolution =
+  | {
+      kind: "handler";
+      handler: ApiRouteHandler;
+      stripBody: boolean;
+    }
+  | {
+      kind: "response";
+      response: Response;
+    };
 
 export async function dispatchApiRequest(
   request: Request,
@@ -33,18 +49,18 @@ export async function dispatchApiRequest(
   }
 
   const module = await match.route.load();
-  const method = request.method.toUpperCase() as HttpMethod;
-  const handler = module[method] ?? module.ALL;
+  const method = request.method.toUpperCase();
+  const resolution = resolveApiMethod(module, method);
 
-  if (!handler) {
-    return createMethodNotAllowedResponse(module);
+  if (resolution.kind === "response") {
+    return resolution.response;
   }
 
-  const value = await handler(request, {
+  const value = await resolution.handler(request, {
     params: match.params,
   });
 
-  if (method === "HEAD") {
+  if (resolution.stripBody) {
     const response = toResponse(value);
     return new Response(null, response);
   }
@@ -52,25 +68,104 @@ export async function dispatchApiRequest(
   return toResponse(value);
 }
 
-function createMethodNotAllowedResponse(module: ApiRouteModule): Response {
-  if (module.ALL) {
-    return new Response("Method Not Allowed", {
-      status: 405,
-      headers: {
-        allow: HTTP_METHODS.join(", "),
-      },
-    });
+function resolveApiMethod(module: ApiRouteModule, method: string): ApiMethodResolution {
+  const allowed = allowedMethods(module);
+
+  if (method === "OPTIONS" && !module.OPTIONS && !module.ALL && allowed.includes("OPTIONS")) {
+    return {
+      kind: "response",
+      response: createOptionsResponse(allowed),
+    };
   }
 
-  const allowed = HTTP_METHODS.filter(function filterMethod(method) {
-    return Boolean(module[method]);
-  });
+  if (!isHttpMethod(method)) {
+    if (module.ALL) {
+      return {
+        kind: "handler",
+        handler: module.ALL,
+        stripBody: false,
+      };
+    }
 
+    return {
+      kind: "response",
+      response: createMethodNotAllowedResponse(allowed),
+    };
+  }
+
+  let handler: ApiRouteHandler | undefined;
+
+  if (method === "HEAD") {
+    handler = module.HEAD ?? module.GET ?? module.ALL;
+  } else {
+    handler = module[method] ?? module.ALL;
+  }
+
+  if (!handler) {
+    return {
+      kind: "response",
+      response: createMethodNotAllowedResponse(allowed),
+    };
+  }
+
+  return {
+    kind: "handler",
+    handler,
+    stripBody: method === "HEAD",
+  };
+}
+
+function createMethodNotAllowedResponse(allowed: HttpMethod[]): Response {
   return new Response("Method Not Allowed", {
     status: 405,
     headers: {
       allow: allowed.join(", "),
     },
+  });
+}
+
+function createOptionsResponse(allowed: HttpMethod[]): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      allow: allowed.join(", "),
+    },
+  });
+}
+
+function allowedMethods(module: ApiRouteModule): HttpMethod[] {
+  if (module.ALL) {
+    return [...HTTP_METHODS];
+  }
+
+  const allowed: HttpMethod[] = [];
+
+  for (const method of HTTP_METHODS) {
+    if (method === "HEAD") {
+      if (module.HEAD || module.GET) {
+        allowed.push(method);
+      }
+      continue;
+    }
+
+    if (method === "OPTIONS") {
+      if (module.OPTIONS || allowed.length > 0) {
+        allowed.push(method);
+      }
+      continue;
+    }
+
+    if (module[method]) {
+      allowed.push(method);
+    }
+  }
+
+  return allowed;
+}
+
+function isHttpMethod(method: string): method is HttpMethod {
+  return HTTP_METHODS.some(function matchMethod(httpMethod) {
+    return httpMethod === method;
   });
 }
 

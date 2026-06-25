@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { ServerBuildManifest } from "../routing/types";
 import type { ApiRouteModule, RuntimeApiRoute } from "./api";
 import { dispatchApiRequest } from "./api";
-import { startNodeServer, type RunningServer } from "./http";
+import { createServerErrorResponse, startNodeServer, type RunningServer } from "./http";
 import { serveSpaFallback, serveStaticFile } from "./static";
 
 export interface StartOptions {
@@ -32,19 +32,23 @@ export async function createProductionFetchHandler(
   const routes = createRuntimeApiRoutes(serverDirectory, manifest);
 
   return async function handleProductionRequest(request: Request): Promise<Response> {
-    const apiResponse = await dispatchApiRequest(request, routes);
+    try {
+      const apiResponse = await dispatchApiRequest(request, routes);
 
-    if (apiResponse) {
-      return apiResponse;
+      if (apiResponse) {
+        return apiResponse;
+      }
+
+      const staticResponse = await serveStaticFile(request, clientDirectory);
+
+      if (staticResponse) {
+        return staticResponse;
+      }
+
+      return serveSpaFallback(clientDirectory);
+    } catch (error) {
+      return createServerErrorResponse(error);
     }
-
-    const staticResponse = await serveStaticFile(request, clientDirectory);
-
-    if (staticResponse) {
-      return staticResponse;
-    }
-
-    return serveSpaFallback(clientDirectory);
   };
 }
 
