@@ -12,6 +12,7 @@ This is a v0 prototype. It intentionally does not implement SSR or React Server 
 - Mandatory nested `layout.tsx` support.
 - `loading.tsx`, `error.tsx`, and `not-found.tsx` conventions.
 - Server routes under `app/api` with standard `Request` and `Response`.
+- Optional root `proxy.ts` request hook for redirects, rewrites, and headers.
 - One server for Vite dev, production static assets, and server routes.
 - Node runtime support and Bun smoke coverage where Bun is installed.
 
@@ -40,6 +41,7 @@ app/
     api/
       grouped/
         route.ts
+proxy.ts
 ```
 
 Client routes:
@@ -67,6 +69,14 @@ export function GET(request: Request): Response {
 
 Every `app/api/**/route.ts` file is server-only. Handlers may export `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, and `ALL`. If `GET` is present and `HEAD` is not, `now` runs the `GET` handler for `HEAD` requests and removes the response body. If `OPTIONS` is not exported, `now` generates a 204 response with an `Allow` header from the available handlers. `ALL` remains the fallback for adapter-style routes when a specific method export is not present.
 Route groups may appear before or inside `api`, so `app/(internal)/api/grouped/route.ts` maps to `/api/grouped`.
+
+Root proxy:
+
+- `proxy.ts` at the project root runs once before static files, API routes, and SPA fallback.
+- Export either `proxy` or a default function.
+- Return a normal `Response` to handle the request directly. `Response.redirect()` also works for absolute URLs.
+- Return nothing to continue to the normal server pipeline.
+- Use `next()`, `rewrite()`, or `redirect()` from `now/server` for response headers, request header forwarding, relative redirects, and internal rewrites.
 
 ## Runtime APIs
 
@@ -111,6 +121,37 @@ export function ALL(request: Request, context: ApiRouteContext<"/api/rpc/[...pat
 ```
 
 `ALL` is an adapter-friendly fallback that runs for any HTTP method when a specific method export is not present.
+
+## Proxy Convention
+
+```ts
+// proxy.ts
+import { next, redirect, rewrite } from "now/server";
+
+export function proxy(request: Request): Response | undefined {
+  const url = new URL(request.url);
+
+  if (url.pathname === "/old") {
+    return redirect("/new", 308);
+  }
+
+  if (url.pathname === "/healthz") {
+    const response = rewrite(new URL("/api/health", request.url));
+    response.headers.set("x-proxy", "rewrite");
+
+    return response;
+  }
+
+  const response = next();
+  response.headers.set("x-powered-by", "now");
+
+  return response;
+}
+```
+
+Proxy runs before the framework decides whether a request is for a static asset, an API route, or the client app fallback. A rewrite changes the URL used by that downstream dispatch without issuing a browser redirect and does not run proxy a second time. To forward modified request headers, pass a full `Headers` object through `next({ request: { headers } })` or `rewrite(url, { request: { headers } })`.
+
+Request bodies are intentionally conservative: proxy receives the original `Request`, and downstream handlers receive the same body stream unless you create a forwarded request. Do not read a request body in proxy before continuing or rewriting to an API route that also needs to read it.
 
 ## Commands
 
@@ -159,4 +200,5 @@ Nitro was evaluated as the server layer. The current implementation uses a minim
 - `loading.tsx` is used as route-load pending UI, not streaming UI.
 - Catch-all params are exposed as arrays through `useParams`.
 - Optional catch-all params are exposed as empty arrays for the base path.
+- Proxy request bodies are single-use streams; body reads in proxy are not replayed downstream.
 - Production server output expects the project dependencies to be installed.

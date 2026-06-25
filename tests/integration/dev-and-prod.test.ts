@@ -8,6 +8,10 @@ import { createProductionFetchHandler } from "../../src/server/prod";
 
 const exampleRoot = resolve("examples/basic");
 
+interface TestClient {
+  request(path: string, init?: RequestInit): Promise<Response>;
+}
+
 describe("dev and production flows", function integrationSuite() {
   const closers: Array<() => Promise<void>> = [];
 
@@ -56,6 +60,7 @@ describe("dev and production flows", function integrationSuite() {
       runtime: "server",
     });
     expect(pageText).toContain('<div id="root"></div>');
+    await expectProxyBehavior(createDevClient(server.port));
   });
 
   it("builds and creates a production fetch handler", async function productionFlow() {
@@ -114,6 +119,7 @@ describe("dev and production flows", function integrationSuite() {
       value: "[[...path]]",
       param: "path",
     });
+    expect(manifest.proxy?.modulePath).toBe("proxy.mjs");
     expect(groupedJson).toEqual({
       grouped: true,
       runtime: "server",
@@ -127,6 +133,66 @@ describe("dev and production flows", function integrationSuite() {
     expect(failureText).toContain("Intentional API route failure");
     expect(pageText).toContain('<div id="root"></div>');
     expect(docsBaseText).toContain('<div id="root"></div>');
+    await expectProxyBehavior(createProductionClient(handler));
     expect(join(exampleRoot, "dist", "server")).toContain("dist/server");
   });
 });
+
+function createDevClient(port: number): TestClient {
+  return {
+    request: function request(path, init) {
+      return fetch(`http://127.0.0.1:${port}${path}`, init);
+    },
+  };
+}
+
+function createProductionClient(handler: (request: Request) => Promise<Response>): TestClient {
+  return {
+    request: function request(path, init) {
+      return handler(new Request(`http://test.local${path}`, init));
+    },
+  };
+}
+
+async function expectProxyBehavior(client: TestClient): Promise<void> {
+  const directResponse = await client.request("/proxy-direct");
+  const directText = await directResponse.text();
+  const redirectResponse = await client.request("/proxy-redirect", {
+    redirect: "manual",
+  });
+  const nextApiResponse = await client.request("/api/proxy-header?via=next");
+  const nextApiJson = (await nextApiResponse.json()) as { fromProxy: string };
+  const rewriteApiResponse = await client.request("/proxy-rewrite-api");
+  const rewriteApiJson = (await rewriteApiResponse.json()) as { fromProxy: string };
+  const staticResponse = await client.request("/proxy-static.txt");
+  const staticText = await staticResponse.text();
+  const rewriteStaticResponse = await client.request("/proxy-rewrite-static");
+  const rewriteStaticText = await rewriteStaticResponse.text();
+  const rewritePageResponse = await client.request("/proxy-rewrite-page");
+  const rewritePageText = await rewritePageResponse.text();
+  const nextPageResponse = await client.request("/proxy-next-page");
+  const nextPageText = await nextPageResponse.text();
+
+  expect(directText).toBe("handled by proxy");
+  expect(directResponse.headers.get("x-proxy-direct")).toBe("true");
+  expect(redirectResponse.status).toBe(308);
+  expect(redirectResponse.headers.get("location")).toBe("/about");
+  expect(nextApiJson).toEqual({
+    fromProxy: "next-api",
+  });
+  expect(nextApiResponse.headers.get("x-proxy-next")).toBe("api");
+  expect(rewriteApiJson).toEqual({
+    fromProxy: "rewrite-api",
+  });
+  expect(rewriteApiResponse.headers.get("x-proxy-rewrite")).toBe("api");
+  expect(staticText).toBe("static through proxy\n");
+  expect(staticResponse.headers.get("cache-control")).toBe("proxy-cache");
+  expect(staticResponse.headers.get("x-proxy-next")).toBe("static");
+  expect(rewriteStaticText).toBe("static through proxy\n");
+  expect(rewriteStaticResponse.headers.get("cache-control")).toBe("proxy-cache");
+  expect(rewriteStaticResponse.headers.get("x-proxy-rewrite")).toBe("static");
+  expect(rewritePageText).toContain('<div id="root"></div>');
+  expect(rewritePageResponse.headers.get("x-proxy-rewrite")).toBe("page");
+  expect(nextPageText).toContain('<div id="root"></div>');
+  expect(nextPageResponse.headers.get("x-proxy-next")).toBe("page");
+}

@@ -5,6 +5,7 @@ import type { ServerBuildManifest } from "../routing/types";
 import type { ApiRouteModule, RuntimeApiRoute } from "./api";
 import { dispatchApiRequest } from "./api";
 import { createServerErrorResponse, startNodeServer, type RunningServer } from "./http";
+import { handleProxyRequest, type ProxyModule, type RuntimeProxy } from "./proxy";
 import { serveSpaFallback, serveStaticFile } from "./static";
 
 export interface StartOptions {
@@ -30,25 +31,52 @@ export async function createProductionFetchHandler(
   const serverDirectory = join(root, "dist", "server");
   const manifest = await readManifest(serverDirectory);
   const routes = createRuntimeApiRoutes(serverDirectory, manifest);
+  const proxy = createRuntimeProxy(serverDirectory, manifest);
 
   return async function handleProductionRequest(request: Request): Promise<Response> {
     try {
-      const apiResponse = await dispatchApiRequest(request, routes);
+      return await handleProxyRequest(
+        request,
+        proxy,
+        async function handleDownstreamRequest(proxiedRequest) {
+          const apiResponse = await dispatchApiRequest(proxiedRequest, routes);
 
-      if (apiResponse) {
-        return apiResponse;
-      }
+          if (apiResponse) {
+            return apiResponse;
+          }
 
-      const staticResponse = await serveStaticFile(request, clientDirectory);
+          const staticResponse = await serveStaticFile(proxiedRequest, clientDirectory);
 
-      if (staticResponse) {
-        return staticResponse;
-      }
+          if (staticResponse) {
+            return staticResponse;
+          }
 
-      return serveSpaFallback(clientDirectory);
+          return serveSpaFallback(clientDirectory);
+        },
+      );
     } catch (error) {
       return createServerErrorResponse(error);
     }
+  };
+}
+
+function createRuntimeProxy(
+  serverDirectory: string,
+  manifest: ServerBuildManifest,
+): RuntimeProxy | undefined {
+  const proxyManifest = manifest.proxy;
+
+  if (!proxyManifest) {
+    return undefined;
+  }
+
+  return {
+    filePath: proxyManifest.modulePath,
+    load: function loadProxyModule(): Promise<ProxyModule> {
+      return import(
+        pathToFileURL(join(serverDirectory, proxyManifest.modulePath)).href
+      ) as Promise<ProxyModule>;
+    },
   };
 }
 

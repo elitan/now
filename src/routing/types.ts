@@ -44,6 +44,11 @@ export interface GeneratedServerRoute {
   segments: RouteSegment[];
 }
 
+export interface GeneratedProxy {
+  modulePath: string;
+}
+
 export interface ServerBuildManifest {
   apiRoutes: GeneratedServerRoute[];
+  proxy?: GeneratedProxy;
 }
