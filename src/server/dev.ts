@@ -7,7 +7,12 @@ import { scanApiRoutes } from "../routing/scanner";
 import { writeGeneratedClientFiles } from "../vite/generated";
 import type { ApiRouteModule, RuntimeApiRoute } from "./api";
 import { dispatchApiRequest } from "./api";
-import { createWebRequest, type RunningServer, writeWebResponse } from "./http";
+import {
+  createServerErrorResponse,
+  createWebRequest,
+  type RunningServer,
+  writeWebResponse,
+} from "./http";
 import type { StartOptions } from "./prod";
 import { createViteConfig, resolveNowRuntimePaths } from "./vite-config";
 
@@ -99,16 +104,7 @@ async function handleDevRequest(
     );
   } catch (error) {
     vite.ssrFixStacktrace(error as Error);
-    const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
-    await writeWebResponse(
-      nodeResponse,
-      new Response(message, {
-        status: 500,
-        headers: {
-          "content-type": "text/plain; charset=utf-8",
-        },
-      }),
-    );
+    await writeWebResponse(nodeResponse, createServerErrorResponse(error));
   }
 }
 

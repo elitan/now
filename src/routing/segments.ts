@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { relative, sep } from "node:path";
-import type { RouteSegment } from "./types";
+import type { RouteParams, RouteSegment } from "./types";
 
 export function pathSegmentsFromRouteDirectory(appDir: string, routeDirectory: string): string[] {
   const relativePath = relative(appDir, routeDirectory);
@@ -132,3 +132,41 @@ function validateCatchAllSegmentsAreTerminal(segments: RouteSegment[]): void {
     `Catch-all route segment "${catchAllSegment.value}" must be the final route segment.`,
   );
 }
+
+export type RouteParamsForPath<Path extends string> = string extends Path
+  ? RouteParams
+  : Prettify<ParseRouteParams<StripLeadingSlash<Path>>>;
+
+type Prettify<TValue> = {
+  [Key in keyof TValue as Key extends typeof emptyRouteParamsSymbol ? never : Key]: TValue[Key];
+};
+
+declare const emptyRouteParamsSymbol: unique symbol;
+
+type EmptyRouteParams = {
+  [emptyRouteParamsSymbol]?: never;
+};
+
+type StripLeadingSlash<Path extends string> = Path extends `/${infer Rest}`
+  ? StripLeadingSlash<Rest>
+  : Path;
+
+type ParseRouteParams<Path extends string> = Path extends ""
+  ? EmptyRouteParams
+  : Path extends `${infer Segment}/${infer Rest}`
+    ? SegmentParam<Segment> & ParseRouteParams<Rest>
+    : SegmentParam<Path>;
+
+type SegmentParam<Segment extends string> = Segment extends `[[...${infer Param}]]`
+  ? { [Key in Param]: string[] }
+  : Segment extends `[...${infer Param}]`
+    ? { [Key in Param]: string[] }
+    : Segment extends `[${infer Param}]`
+      ? { [Key in Param]: string }
+      : Segment extends `:${infer Param}`
+        ? { [Key in Param]: string }
+        : Segment extends `*${infer Param}?`
+          ? { [Key in Param]: string[] }
+          : Segment extends `*${infer Param}`
+            ? { [Key in Param]: string[] }
+            : EmptyRouteParams;

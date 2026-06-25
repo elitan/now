@@ -159,6 +159,56 @@ describe("file route scanning", function routeScanningSuite() {
     );
   });
 
+  it("rejects client pages inside app/api", function rejectApiClientPage() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(
+      root,
+      "app/api/users/page.tsx",
+      "export default function Page(){ return null }",
+    );
+
+    expect(function scanRoutes() {
+      scanApiRoutes(root);
+    }).toThrowError(/app\/api is reserved for server route\.ts files/);
+  });
+
+  it("rejects catch-all route segments before the end", function rejectInvalidCatchAll() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(
+      root,
+      "app/api/files/[...path]/meta/route.ts",
+      "export function GET(){ return new Response() }",
+    );
+
+    expect(function scanRoutes() {
+      scanApiRoutes(root);
+    }).toThrowError(/must be the final route segment/);
+  });
+
+  it("rejects duplicate API route URL shapes", function rejectDuplicateApiShape() {
+    const root = createTempProject();
+    tempProjects.push(root);
+
+    writeProjectFile(
+      root,
+      "app/api/(one)/users/[id]/route.ts",
+      "export function GET(){ return new Response() }",
+    );
+    writeProjectFile(
+      root,
+      "app/api/(two)/users/[userId]/route.ts",
+      "export function GET(){ return new Response() }",
+    );
+
+    expect(function scanRoutes() {
+      scanApiRoutes(root);
+    }).toThrowError(/Conflicting API routes/);
+  });
+
   it("scans grouped API routes that resolve under api", function scanGroupedApiRoutes() {
     const root = createTempProject();
     tempProjects.push(root);

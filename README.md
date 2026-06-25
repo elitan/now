@@ -65,7 +65,7 @@ export function GET(request: Request): Response {
 }
 ```
 
-Every `app/api/**/route.ts` file is server-only. Handlers may export `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, and `ALL`.
+Every `app/api/**/route.ts` file is server-only. Handlers may export `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, and `ALL`. If `GET` is present and `HEAD` is not, `now` runs the `GET` handler for `HEAD` requests and removes the response body. If `OPTIONS` is not exported, `now` generates a 204 response with an `Allow` header from the available handlers. `ALL` remains the fallback for adapter-style routes when a specific method export is not present.
 Route groups may appear before or inside `api`, so `app/(internal)/api/grouped/route.ts` maps to `/api/grouped`.
 
 ## Runtime APIs
@@ -100,7 +100,7 @@ Use `app/api` for all server-side routes. For RPC libraries, make a catch-all se
 // app/api/rpc/[...path]/route.ts
 import type { ApiRouteContext } from "now/server";
 
-export function ALL(request: Request, context: ApiRouteContext): Response {
+export function ALL(request: Request, context: ApiRouteContext<"/api/rpc/[...path]">): Response {
   const url = new URL(request.url);
 
   return Response.json({

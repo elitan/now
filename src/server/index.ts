@@ -1,1 +1,1 @@
-export type { ApiRouteContext, ApiRouteHandler, ApiRouteModule } from "./api";
+export type { ApiRouteContext, ApiRouteHandler, ApiRouteModule, ApiRouteParams } from "./api";

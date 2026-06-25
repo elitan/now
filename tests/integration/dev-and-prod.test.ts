@@ -25,6 +25,14 @@ describe("dev and production flows", function integrationSuite() {
 
     const apiResponse = await fetch(`http://127.0.0.1:${server.port}/api/health`);
     const apiJson = (await apiResponse.json()) as { ok: boolean; runtime: string };
+    const headResponse = await fetch(`http://127.0.0.1:${server.port}/api/users/123`, {
+      method: "HEAD",
+    });
+    const optionsResponse = await fetch(`http://127.0.0.1:${server.port}/api/users/123`, {
+      method: "OPTIONS",
+    });
+    const failureResponse = await fetch(`http://127.0.0.1:${server.port}/api/fail`);
+    const failureText = await failureResponse.text();
     const filesResponse = await fetch(`http://127.0.0.1:${server.port}/api/files`);
     const filesJson = (await filesResponse.json()) as { path: string[] };
     const groupedResponse = await fetch(`http://127.0.0.1:${server.port}/api/grouped`);
@@ -36,6 +44,12 @@ describe("dev and production flows", function integrationSuite() {
       ok: true,
       runtime: "server",
     });
+    expect(headResponse.status).toBe(200);
+    expect(await headResponse.text()).toBe("");
+    expect(optionsResponse.status).toBe(204);
+    expect(optionsResponse.headers.get("allow")).toBe("GET, HEAD, OPTIONS");
+    expect(failureResponse.status).toBe(500);
+    expect(failureText).toContain("Intentional API route failure");
     expect(filesJson.path).toEqual([]);
     expect(groupedJson).toEqual({
       grouped: true,
@@ -58,6 +72,16 @@ describe("dev and production flows", function integrationSuite() {
     });
     const apiResponse = await handler(new Request("http://test.local/api/users/123"));
     const apiJson = (await apiResponse.json()) as { id: string };
+    const headResponse = await handler(
+      new Request("http://test.local/api/users/123", {
+        method: "HEAD",
+      }),
+    );
+    const optionsResponse = await handler(
+      new Request("http://test.local/api/users/123", {
+        method: "OPTIONS",
+      }),
+    );
     const groupedResponse = await handler(new Request("http://test.local/api/grouped"));
     const groupedJson = (await groupedResponse.json()) as {
       grouped: boolean;
@@ -73,12 +97,18 @@ describe("dev and production flows", function integrationSuite() {
       path: string;
       params: string[];
     };
+    const failureResponse = await handler(new Request("http://test.local/api/fail"));
+    const failureText = await failureResponse.text();
     const pageResponse = await handler(new Request("http://test.local/docs/a/b"));
     const docsBaseResponse = await handler(new Request("http://test.local/docs"));
     const pageText = await pageResponse.text();
     const docsBaseText = await docsBaseResponse.text();
 
     expect(apiJson.id).toBe("123");
+    expect(headResponse.status).toBe(200);
+    expect(await headResponse.text()).toBe("");
+    expect(optionsResponse.status).toBe(204);
+    expect(optionsResponse.headers.get("allow")).toBe("GET, HEAD, OPTIONS");
     expect(filesRoute?.segments.at(-1)).toEqual({
       kind: "optionalCatchAll",
       value: "[[...path]]",
@@ -93,6 +123,8 @@ describe("dev and production flows", function integrationSuite() {
       path: "/api/rpc/hello",
       params: ["hello"],
     });
+    expect(failureResponse.status).toBe(500);
+    expect(failureText).toContain("Intentional API route failure");
     expect(pageText).toContain('<div id="root"></div>');
     expect(docsBaseText).toContain('<div id="root"></div>');
     expect(join(exampleRoot, "dist", "server")).toContain("dist/server");

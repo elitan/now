@@ -80,16 +80,26 @@ test("serves dynamic and catch-all API routes in production", async function api
 }) {
   const userResponse = await request.get("/api/users/42");
   const userJson = (await userResponse.json()) as { id: string };
+  const headResponse = await request.head("/api/users/42");
+  const optionsResponse = await request.fetch("/api/users/42", {
+    method: "OPTIONS",
+  });
   const filesBaseResponse = await request.get("/api/files");
   const groupedResponse = await request.get("/api/grouped");
   const groupedJson = (await groupedResponse.json()) as { grouped: boolean; runtime: string };
   const filesResponse = await request.get("/api/files/a/b/c");
   const rpcResponse = await request.post("/api/rpc/e2e");
+  const failureResponse = await request.get("/api/fail");
+  const failureText = await failureResponse.text();
   const filesBaseJson = (await filesBaseResponse.json()) as { path: string[] };
   const filesJson = (await filesResponse.json()) as { path: string[] };
   const rpcJson = (await rpcResponse.json()) as { rpc: boolean; path: string; params: string[] };
 
   expect(userJson.id).toBe("42");
+  expect(headResponse.status()).toBe(200);
+  expect(await headResponse.text()).toBe("");
+  expect(optionsResponse.status()).toBe(204);
+  expect(optionsResponse.headers().allow).toBe("GET, HEAD, OPTIONS");
   expect(filesBaseJson.path).toEqual([]);
   expect(groupedJson).toEqual({
     grouped: true,
@@ -101,4 +111,6 @@ test("serves dynamic and catch-all API routes in production", async function api
     path: "/api/rpc/e2e",
     params: ["e2e"],
   });
+  expect(failureResponse.status()).toBe(500);
+  expect(failureText).toContain("Intentional API route failure");
 });

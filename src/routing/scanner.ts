@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { scanFiles } from "../utils/files";
 import {
   createRouteId,
@@ -48,6 +48,7 @@ export function scanClientRoutes(projectRoot: string): ClientRouteFile[] {
 
   const routes: ClientRouteFile[] = [];
   const files = scanFiles(appDir);
+  assertNoClientPagesInsideApiDirectory(appDir, files);
 
   for (const file of files) {
     if (basename(file) !== PAGE_FILE) {
@@ -99,6 +100,7 @@ export function scanApiRoutes(projectRoot: string): ApiRouteFile[] {
 
   const routes: ApiRouteFile[] = [];
   const files = scanFiles(appDir);
+  assertNoClientPagesInsideApiDirectory(appDir, files);
 
   for (const file of files) {
     if (basename(file) !== API_ROUTE_FILE) {
@@ -183,6 +185,28 @@ function collectAncestorDirectories(appDir: string, routeDirectory: string): str
 function isApiRouteSegments(segments: RouteSegment[]): boolean {
   const firstSegment = segments[0];
   return firstSegment?.kind === "static" && firstSegment.value === "api";
+}
+
+function assertNoClientPagesInsideApiDirectory(appDir: string, files: string[]): void {
+  for (const file of files) {
+    if (basename(file) !== PAGE_FILE || !isInsidePhysicalApiDirectory(appDir, file)) {
+      continue;
+    }
+
+    throw new Error(
+      [
+        `Invalid app/api route: ${relative(appDir, file)} is a client page inside app/api.`,
+        "app/api is reserved for server route.ts files.",
+      ].join(" "),
+    );
+  }
+}
+
+function isInsidePhysicalApiDirectory(appDir: string, file: string): boolean {
+  const apiRelativePath = relative(join(appDir, "api"), file);
+  return (
+    Boolean(apiRelativePath) && !apiRelativePath.startsWith("..") && !isAbsolute(apiRelativePath)
+  );
 }
 
 function assertNoRouteConflicts(

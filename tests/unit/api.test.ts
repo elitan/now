@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { parseRouteSegments } from "../../src/routing/segments";
 import {
+  type ApiRouteContext,
   dispatchApiRequest,
   type ApiRouteModule,
   type RuntimeApiRoute,
@@ -73,7 +74,101 @@ describe("API dispatch", function apiDispatchSuite() {
     );
 
     expect(response?.status).toBe(405);
-    expect(response?.headers.get("allow")).toBe("GET");
+    expect(response?.headers.get("allow")).toBe("GET, HEAD, OPTIONS");
+  });
+
+  it("dispatches HEAD to GET without a response body", async function dispatchHeadFromGet() {
+    const routes: RuntimeApiRoute[] = [
+      createRuntimeRoute({
+        id: "api-health-route",
+        routePath: "/api/health",
+        rawSegments: ["api", "health"],
+        module: {
+          GET: function GET() {
+            return new Response("visible to GET", {
+              status: 201,
+              headers: {
+                "x-api-route": "health",
+              },
+            });
+          },
+        },
+      }),
+    ];
+
+    const response = await dispatchApiRequest(
+      new Request("http://test.local/api/health", {
+        method: "HEAD",
+      }),
+      routes,
+    );
+
+    expect(response?.status).toBe(201);
+    expect(response?.headers.get("x-api-route")).toBe("health");
+    expect(await response?.text()).toBe("");
+  });
+
+  it("creates OPTIONS responses from supported route methods", async function automaticOptions() {
+    const routes: RuntimeApiRoute[] = [
+      createRuntimeRoute({
+        id: "api-users-route",
+        routePath: "/api/users",
+        rawSegments: ["api", "users"],
+        module: {
+          GET: function GET() {
+            return Response.json({ ok: true });
+          },
+          POST: function POST() {
+            return Response.json({ ok: true });
+          },
+        },
+      }),
+    ];
+
+    const response = await dispatchApiRequest(
+      new Request("http://test.local/api/users", {
+        method: "OPTIONS",
+      }),
+      routes,
+    );
+
+    expect(response?.status).toBe(204);
+    expect(response?.headers.get("allow")).toBe("GET, POST, HEAD, OPTIONS");
+    expect(await response?.text()).toBe("");
+  });
+
+  it("prefers explicit OPTIONS exports", async function explicitOptions() {
+    const routes: RuntimeApiRoute[] = [
+      createRuntimeRoute({
+        id: "api-health-route",
+        routePath: "/api/health",
+        rawSegments: ["api", "health"],
+        module: {
+          GET: function GET() {
+            return Response.json({ ok: true });
+          },
+          OPTIONS: function OPTIONS() {
+            return new Response("custom", {
+              status: 200,
+              headers: {
+                allow: "GET, OPTIONS",
+              },
+            });
+          },
+        },
+      }),
+    ];
+
+    const response = await dispatchApiRequest(
+      new Request("http://test.local/api/health", {
+        method: "OPTIONS",
+      }),
+      routes,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get("allow")).toBe("GET, OPTIONS");
+    expect(await response?.text()).toBe("custom");
   });
 
   it("dispatches catch-all API params", async function dispatchCatchAllRoute() {
@@ -281,5 +376,48 @@ describe("API dispatch", function apiDispatchSuite() {
       method: "POST",
       path: ["posts", "list"],
     });
+  });
+
+  it("keeps ALL as the fallback for OPTIONS requests", async function dispatchAllOptionsRoute() {
+    const routes: RuntimeApiRoute[] = [
+      createRuntimeRoute({
+        id: "api-rpc-path-route",
+        routePath: "/api/rpc/*path",
+        rawSegments: ["api", "rpc", "[...path]"],
+        module: {
+          ALL: function ALL(request, context) {
+            return Response.json({
+              method: request.method,
+              path: context.params.path,
+            });
+          },
+        },
+      }),
+    ];
+
+    const response = await dispatchApiRequest(
+      new Request("http://test.local/api/rpc/posts/list", {
+        method: "OPTIONS",
+      }),
+      routes,
+    );
+    const json = (await response?.json()) as { method: string; path: string[] };
+
+    expect(json).toEqual({
+      method: "OPTIONS",
+      path: ["posts", "list"],
+    });
+  });
+
+  it("types route context params from route literals", function apiContextTypes() {
+    expectTypeOf<ApiRouteContext<"/api/users/[id]">["params"]>().toEqualTypeOf<{
+      id: string;
+    }>();
+    expectTypeOf<ApiRouteContext<"/api/files/[...path]">["params"]>().toEqualTypeOf<{
+      path: string[];
+    }>();
+    expectTypeOf<ApiRouteContext<"/api/files/[[...path]]">["params"]>().toEqualTypeOf<{
+      path: string[];
+    }>();
   });
 });

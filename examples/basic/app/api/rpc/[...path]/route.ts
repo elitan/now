@@ -1,6 +1,6 @@
 import type { ApiRouteContext } from "now/server";
 
-export function ALL(request: Request, context: ApiRouteContext): Response {
+export function ALL(request: Request, context: ApiRouteContext<"/api/rpc/[...path]">): Response {
   const url = new URL(request.url);
 
   return Response.json({
